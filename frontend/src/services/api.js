@@ -112,7 +112,9 @@ export const approveInvoice = async (approvalId, approverName, comments = '') =>
   formData.append('approver_name', approverName);
   if (comments) formData.append('comments', comments);
   
-  const response = await api.post(`/approvals/${approvalId}/approve`, formData);
+  const response = await api.post(`/approvals/${approvalId}/approve`, formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
   return response.data;
 };
 
@@ -121,7 +123,9 @@ export const rejectInvoice = async (approvalId, rejectorName, reason) => {
   formData.append('rejector_name', rejectorName);
   formData.append('reason', reason);
   
-  const response = await api.post(`/approvals/${approvalId}/reject`, formData);
+  const response = await api.post(`/approvals/${approvalId}/reject`, formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
   return response.data;
 };
 
