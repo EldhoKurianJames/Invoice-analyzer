@@ -5,13 +5,13 @@ COUNTRY_RULES = {
     "russia": {
         "banned_items": ["polythene", "plastic", "synthetic polymer"],
         "restricted_items": ["steel", "iron"],
-        "max_value_usd": 2350000,
+        "max_value_usd": 23500000,
         "required_certificates": ["phytosanitary", "quality_certificate"]
     },
     "china": {
         "banned_items": ["cotton", "textile"],
         "restricted_items": ["electronics"],
-        "max_value_usd": 100000,
+        "max_value_usd": 10000000,
         "required_certificates": ["origin_certificate"]
     },
     "usa": {
@@ -60,7 +60,7 @@ COUNTRY_TAX_RATES = {
         "hs_code_rates": {
             "870321": {"rate": 25.0, "description": "Passenger Cars"},
             "870322": {"rate": 25.0, "description": "Passenger Vehicles"},
-            "260111": {"rate": 3.0, "description": "Iron Ore Fines"},
+            "260111": {"rate": 5.0, "description": "Iron Ore Fines"},
             "720851": {"rate": 13.0, "description": "Steel Coils"},
             "854231": {"rate": 13.0, "description": "Electronic Processors"},
             "520100": {"rate": 16.0, "description": "Cotton"},

@@ -27,6 +27,15 @@ from app.database.init_db import init_db
 # Create database tables
 
 init_db()
+try:
+    import app.validation.country_rules as _country_rules
+    print("COUNTRY_RULES MODULE =", getattr(_country_rules, "__file__", "<unknown>"))
+    print(
+        "COUNTRY_RULES[china].max_value_usd =",
+        _country_rules.COUNTRY_RULES.get("china", {}).get("max_value_usd", "<missing>")
+    )
+except Exception as _e:
+    print("FAILED TO LOAD COUNTRY_RULES FOR DIAGNOSTICS:", _e)
 print("DATABASE URL =", engine.url)
 app = FastAPI(title="Invoice AI API", description="Intelligent Invoice Processing System")
 
@@ -42,9 +51,10 @@ app.add_middleware(
 )
 
 # Directories
-TEMP_DIR = "d:\\minipro\\invoice-ai\\backend\\temp"
-SIGNED_INVOICES_DIR = "d:\\minipro\\invoice-ai\\backend\\data\\signed_invoices"
-ASSETS_DIR = "d:\\minipro\\invoice-ai\\backend\\assets"
+BACKEND_DIR = Path(__file__).resolve().parents[1]
+TEMP_DIR = str(BACKEND_DIR / "temp")
+SIGNED_INVOICES_DIR = str(BACKEND_DIR / "data" / "signed_invoices")
+ASSETS_DIR = str(BACKEND_DIR / "assets")
 os.makedirs(TEMP_DIR, exist_ok=True)
 os.makedirs(SIGNED_INVOICES_DIR, exist_ok=True)
 os.makedirs(ASSETS_DIR, exist_ok=True)
@@ -225,40 +235,32 @@ async def upload_invoice(
             except:
                 pass
             
-            # Save line items for analytics
+            # Save invoice to database with all details including line items
             try:
-                line_item_count = 0
+                # Ensure line items have proper categories and tax calculations
                 for item in invoice_data.line_items:
-                    classification = classify_product(item.description, getattr(item, 'hs_code', None))
-                    tax_amount = None
-                    if getattr(item, 'subtotal', None) and getattr(item, 'tax_percentage', None):
-                        tax_amount = item.subtotal * item.tax_percentage / 100
+                    if not hasattr(item, 'category') or not item.category:
+                        classification = classify_product(item.description, getattr(item, 'hs_code', None))
+                        item.category = classification.get('category') if classification.get('classified') else None
                     
-                    line_item_record = models.InvoiceLineItem(
-                        invoice_id=invoice_data.invoice_id,
-                        description=item.description,
-                        hs_code=getattr(item, 'hs_code', None),
-                        category=classification.get('category') if classification.get('classified') else None,
-                        quantity=getattr(item, 'quantity', 1.0),
-                        unit_price=getattr(item, 'unit_price', None),
-                        subtotal=getattr(item, 'subtotal', None),
-                        tax_percentage=getattr(item, 'tax_percentage', None),
-                        tax_amount=tax_amount,
-                        total=item.total,
-                        country=country
-                    )
-                    db.add(line_item_record)
-                    line_item_count += 1
-                db.commit()
-                print(f"DEBUG MAIN: Successfully committed {line_item_count} line items to database")
-            except Exception as e:
-                print(f"ERROR: Failed to save line items: {e}")
-                db.rollback()
-            
-            # Save invoice to database
-            try:
-                saved_invoice = crud.create_invoice(db=db, invoice=invoice_data)
-                print(f"DEBUG MAIN: Successfully inserted invoice {saved_invoice.invoice_id} (ID: {saved_invoice.id}) to database")
+                    # Calculate tax_amount if missing
+                    if not item.tax_amount and getattr(item, 'subtotal', None) and getattr(item, 'tax_percentage', None):
+                        item.tax_amount = item.subtotal * item.tax_percentage / 100
+                
+                # Get fraud flags if available
+                fraud_flags = []
+                if fraud_result and getattr(fraud_result, "flags", None):
+                    fraud_flags = fraud_result.flags
+                
+                saved_invoice = crud.create_invoice(
+                    db=db, 
+                    invoice=invoice_data,
+                    vendor_name=vendor_name,
+                    country=country,
+                    fraud_score=fraud_result.fraud_score if fraud_result else 0.0,
+                    fraud_flags=fraud_flags
+                )
+                print(f"DEBUG MAIN: Successfully inserted invoice {saved_invoice.invoice_id} (ID: {saved_invoice.id}) with {len(invoice_data.line_items)} line items to database")
             except Exception as e:
                 print(f"ERROR: Failed to save invoice: {e}")
                 db.rollback()
@@ -346,46 +348,110 @@ async def get_all_invoices(db: Session = Depends(get_db)):
 
 @app.get("/invoices/export")
 async def export_invoices_to_excel(db: Session = Depends(get_db)):
-    """Export all invoices to an Excel file."""
+    """Export all invoices to an Excel file with comprehensive details."""
     invoices = crud.get_all_invoices(db)
     
     # Create Excel workbook
     wb = Workbook()
-    ws = wb.active
-    ws.title = "Invoices"
     
-    # Add headers
-    headers = ["ID", "Invoice ID", "Invoice Date", "Due Date", "Customer Name", "Total Amount", "Tax Amount"]
-    ws.append(headers)
+    # Sheet 1: Invoice Summary
+    ws_summary = wb.active
+    ws_summary.title = "Invoice Summary"
     
-    # Add data rows
+    # Add headers for summary sheet
+    summary_headers = [
+        "ID", "Invoice ID", "Invoice Date", "Due Date", 
+        "Vendor/Exporter", "Customer/Importer", "Country",
+        "Subtotal", "Tax Amount", "Tax %", "Total Amount",
+        "Fraud Score", "Risk Level", "Created At"
+    ]
+    ws_summary.append(summary_headers)
+    
+    # Add invoice summary data
     for inv in invoices:
-        ws.append([
+        line_items = db.query(models.InvoiceLineItem).filter(
+            models.InvoiceLineItem.invoice_id == inv.invoice_id
+        ).all()
+        computed_subtotal = sum((li.subtotal or 0) for li in line_items) or None
+        computed_tax_amount = sum((li.tax_amount or 0) for li in line_items) or None
+
+        export_subtotal = inv.subtotal if inv.subtotal is not None else computed_subtotal
+        export_tax_amount = inv.tax_amount if inv.tax_amount is not None else computed_tax_amount
+        export_tax_pct = inv.tax_percentage
+        if export_tax_pct is None and export_subtotal and export_tax_amount is not None:
+            try:
+                export_tax_pct = round((export_tax_amount / export_subtotal) * 100, 2)
+            except Exception:
+                export_tax_pct = None
+
+        # Determine risk level based on fraud score
+        risk_level = "Low" if inv.fraud_score < 30 else ("Medium" if inv.fraud_score < 60 else "High")
+        
+        ws_summary.append([
             inv.id,
             inv.invoice_id,
             str(inv.invoice_date) if inv.invoice_date else "",
             str(inv.due_date) if inv.due_date else "",
+            inv.vendor_name or "",
             inv.customer_name or "",
+            inv.country or "",
+            export_subtotal or 0,
+            export_tax_amount or 0,
+            export_tax_pct or 0,
             inv.total_amount or 0,
-            inv.tax_amount or 0
+            inv.fraud_score or 0,
+            risk_level,
+            str(inv.created_at) if inv.created_at else ""
         ])
     
     # Style the header row
-    for cell in ws[1]:
+    for cell in ws_summary[1]:
         cell.font = cell.font.copy(bold=True)
     
-    # Auto-adjust column widths
-    for column in ws.columns:
-        max_length = 0
-        column_letter = column[0].column_letter
-        for cell in column:
-            try:
-                if len(str(cell.value)) > max_length:
-                    max_length = len(str(cell.value))
-            except:
-                pass
-        adjusted_width = (max_length + 2)
-        ws.column_dimensions[column_letter].width = adjusted_width
+    # Sheet 2: Line Items Detail
+    ws_items = wb.create_sheet("Line Items")
+    item_headers = [
+        "Invoice ID", "Item Description", "HS Code", "Category",
+        "Quantity", "Unit Price", "Subtotal", 
+        "Tax %", "Tax Amount", "Total", "Country"
+    ]
+    ws_items.append(item_headers)
+    
+    # Add line items for all invoices
+    for inv in invoices:
+        line_items = crud.get_invoice_line_items(db, inv.invoice_id)
+        for item in line_items:
+            ws_items.append([
+                item.invoice_id,
+                item.description,
+                item.hs_code or "",
+                item.category or "",
+                item.quantity or 0,
+                item.unit_price or 0,
+                item.subtotal or 0,
+                item.tax_percentage or 0,
+                item.tax_amount or 0,
+                item.total or 0,
+                item.country or ""
+            ])
+    
+    # Style line items header
+    for cell in ws_items[1]:
+        cell.font = cell.font.copy(bold=True)
+    
+    # Auto-adjust column widths for both sheets
+    for ws in [ws_summary, ws_items]:
+        for column in ws.columns:
+            max_length = 0
+            column_letter = column[0].column_letter
+            for cell in column:
+                try:
+                    if len(str(cell.value)) > max_length:
+                        max_length = len(str(cell.value))
+                except:
+                    pass
+            adjusted_width = min((max_length + 2), 50)  # Cap at 50
+            ws.column_dimensions[column_letter].width = adjusted_width
     
     # Save the file
     export_path = Path(TEMP_DIR) / "invoices_export.xlsx"
