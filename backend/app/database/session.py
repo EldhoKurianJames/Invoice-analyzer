@@ -8,7 +8,9 @@ load_dotenv()
 
 # Use Supabase/Postgres when `SUPABASE_DB_URL` or `DATABASE_URL` is provided in the environment.
 # Fall back to the existing local SQLite file for development.
-DEFAULT_SQLITE = "sqlite:///d:/minipro/invoice-ai/backend/data/invoices.db"
+_DB_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "data")
+os.makedirs(_DB_DIR, exist_ok=True)
+DEFAULT_SQLITE = f"sqlite:///{os.path.abspath(os.path.join(_DB_DIR, 'invoices.db'))}"
 DATABASE_URL = os.environ.get("SUPABASE_DB_URL") or os.environ.get("DATABASE_URL") or DEFAULT_SQLITE
 
 if DATABASE_URL.startswith("sqlite"):
