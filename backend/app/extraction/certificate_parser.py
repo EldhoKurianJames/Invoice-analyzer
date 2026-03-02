@@ -33,22 +33,46 @@ def parse_quality_certificate(text: str) -> QualityCertificate:
     if validity_match:
         certificate.validity_date = validity_match.group(1)
     
-    # Extract HS codes and descriptions from table
-    # Pattern for HS code entries: "HS Code: 1234" followed by description
-    hs_patterns = [
-        re.compile(r'hs\s+code\s*:\s*(\d{4,8})\s*([^\n\r]+)', re.IGNORECASE),
-        re.compile(r'(\d{4,8})\s*[-–]\s*([A-Za-z\s]+(?:Steel|Iron|Granules|Plastic|Cotton|Textile|Electronics))', re.IGNORECASE),
-        re.compile(r'(\d{4,8})\s+([A-Za-z\s]+)', re.IGNORECASE)
-    ]
-    
-    for pattern in hs_patterns:
-        matches = pattern.findall(text)
-        for match in matches:
-            hs_code, description = match
-            certificate.hs_codes.append({
-                "hs_code": hs_code.strip(),
-                "description": description.strip()
-            })
+    # Extract HS codes and descriptions from certificate table.
+    # Handles multiple layouts:
+    #   Layout A (desc before HS): "Panadol tablets   300490   01/01/2026"
+    #   Layout B (HS before desc): "300490   Panadol tablets"
+    #   Layout C (labeled):        "HS Code: 300490  Description: Panadol tablets"
+    seen_hs = set()
+
+    # Layout A: description text followed by a 6-digit HS code on the same line
+    # Uses \s+ (1 or more spaces) to handle both tight and wide OCR spacing
+    layout_a = re.compile(
+        r'^([A-Za-z][A-Za-z0-9 ,.()/\-]+?)\s+(\d{6})\b',
+        re.IGNORECASE | re.MULTILINE
+    )
+    SKIP_WORDS = {'description', 'hs code', 'hs', 'validity', 'code'}
+    for m in layout_a.finditer(text):
+        desc, hs = m.group(1).strip(), m.group(2).strip()
+        if hs not in seen_hs and desc.lower() not in SKIP_WORDS:
+            certificate.hs_codes.append({"hs_code": hs, "description": desc})
+            seen_hs.add(hs)
+
+    # Layout B: 6-digit HS code followed by description text on the same line
+    layout_b = re.compile(
+        r'\b(\d{6})\b\s+([A-Za-z][A-Za-z0-9 ,.()/\-]+)',
+        re.IGNORECASE
+    )
+    for m in layout_b.finditer(text):
+        hs, desc = m.group(1).strip(), m.group(2).strip()
+        if hs not in seen_hs and desc.lower() not in SKIP_WORDS:
+            certificate.hs_codes.append({"hs_code": hs, "description": desc})
+            seen_hs.add(hs)
+
+    # Layout C: labeled format "HS Code: 300490"
+    layout_c = re.compile(r'hs\s*code\s*[:\-]?\s*(\d{4,8})', re.IGNORECASE)
+    for m in layout_c.finditer(text):
+        hs = m.group(1).strip()
+        if hs not in seen_hs:
+            certificate.hs_codes.append({"hs_code": hs, "description": ""})
+            seen_hs.add(hs)
+
+    print(f"DEBUG CERT PARSER: Extracted hs_codes={certificate.hs_codes}")
     
     # Check for signature presence
     signature_patterns = [

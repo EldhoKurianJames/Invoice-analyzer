@@ -82,23 +82,22 @@ function UploadInvoice() {
   return (
     <div>
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900">Upload Invoice</h1>
-        <p className="text-gray-500 mt-1">Upload invoices for validation and processing</p>
+        <h1 className="text-xl font-bold text-slate-800 dark:text-slate-100">Upload Invoice</h1>
+        <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">Upload invoices for AI-powered validation and processing</p>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Upload Form */}
-        <div className="bg-white rounded-xl shadow-sm p-6">
-          <form onSubmit={handleSubmit}>
+        <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-6">
+          <h2 className="text-sm font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-5">Invoice Details</h2>
+          <form onSubmit={handleSubmit} className="space-y-5">
             {/* Country Selection */}
-            <div className="mb-6">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Destination Country
-              </label>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">Destination Country</label>
               <select
                 value={country}
                 onChange={(e) => setCountry(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                className="w-full px-3 py-2 text-sm border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
               >
                 {COUNTRIES.map((c) => (
                   <option key={c.value} value={c.value}>{c.label}</option>
@@ -107,182 +106,137 @@ function UploadInvoice() {
             </div>
 
             {/* Invoice Upload */}
-            <div className="mb-6">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Invoice File (PDF or Image) *
+            <div>
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">
+                Invoice File <span className="text-red-500">*</span>
               </label>
-              <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-blue-500 transition-colors">
-                <input
-                  type="file"
-                  accept=".pdf,.png,.jpg,.jpeg"
-                  onChange={handleInvoiceChange}
-                  className="hidden"
-                  id="invoice-upload"
-                />
+              <div className={`border-2 border-dashed rounded-lg p-5 text-center transition-colors cursor-pointer ${invoiceFile ? 'border-indigo-300 bg-indigo-50 dark:bg-indigo-900/30 dark:border-indigo-500' : 'border-slate-200 dark:border-slate-600 hover:border-indigo-300 hover:bg-slate-50 dark:hover:bg-slate-700/50'}`}>
+                <input type="file" accept=".pdf,.png,.jpg,.jpeg" onChange={handleInvoiceChange} className="hidden" id="invoice-upload" />
                 <label htmlFor="invoice-upload" className="cursor-pointer">
                   {invoiceFile ? (
-                    <div className="flex items-center justify-center gap-2 text-green-600">
-                      <FileText className="w-8 h-8" />
-                      <span className="font-medium">{invoiceFile.name}</span>
+                    <div className="flex items-center justify-center gap-2 text-indigo-700">
+                      <CheckCircle className="w-5 h-5" />
+                      <span className="text-sm font-medium">{invoiceFile.name}</span>
                     </div>
                   ) : (
                     <div>
-                      <Upload className="w-12 h-12 mx-auto text-gray-400 mb-2" />
-                      <p className="text-gray-600">Click to upload invoice</p>
-                      <p className="text-sm text-gray-400">PDF, PNG, JPG up to 10MB</p>
+                      <Upload className="w-8 h-8 mx-auto text-slate-300 mb-2" />
+                      <p className="text-sm text-slate-600 dark:text-slate-400">Click to upload invoice</p>
+                      <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">PDF, PNG, JPG — up to 10MB</p>
                     </div>
                   )}
                 </label>
               </div>
             </div>
 
-            {/* Certificate Upload (Optional) */}
-            <div className="mb-6">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Quality Certificate (Optional)
+            {/* Certificate Upload */}
+            <div>
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">
+                Certificate <span className="text-slate-400 dark:text-slate-500 font-normal">(optional — required for restricted items)</span>
               </label>
-              <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-blue-500 transition-colors">
-                <input
-                  type="file"
-                  accept=".pdf,.png,.jpg,.jpeg"
-                  onChange={handleCertificateChange}
-                  className="hidden"
-                  id="certificate-upload"
-                />
+              <div className={`border-2 border-dashed rounded-lg p-5 text-center transition-colors cursor-pointer ${certificateFile ? 'border-indigo-300 bg-indigo-50 dark:bg-indigo-900/30 dark:border-indigo-500' : 'border-slate-200 dark:border-slate-600 hover:border-indigo-300 hover:bg-slate-50 dark:hover:bg-slate-700/50'}`}>
+                <input type="file" accept=".pdf,.png,.jpg,.jpeg" onChange={handleCertificateChange} className="hidden" id="certificate-upload" />
                 <label htmlFor="certificate-upload" className="cursor-pointer">
                   {certificateFile ? (
-                    <div className="flex items-center justify-center gap-2 text-green-600">
-                      <FileText className="w-8 h-8" />
-                      <span className="font-medium">{certificateFile.name}</span>
+                    <div className="flex items-center justify-center gap-2 text-indigo-700">
+                      <CheckCircle className="w-5 h-5" />
+                      <span className="text-sm font-medium">{certificateFile.name}</span>
                     </div>
                   ) : (
                     <div>
-                      <Upload className="w-8 h-8 mx-auto text-gray-400 mb-2" />
-                      <p className="text-gray-600 text-sm">Click to upload certificate</p>
-                      <p className="text-xs text-gray-400">Required for restricted items (Iron Ore, Steel)</p>
+                      <Upload className="w-6 h-6 mx-auto text-slate-300 mb-2" />
+                      <p className="text-sm text-slate-500 dark:text-slate-400">Click to upload certificate</p>
                     </div>
                   )}
                 </label>
               </div>
             </div>
 
-            {/* Submit Button */}
+            {/* Submit */}
             <button
               type="submit"
               disabled={loading || !invoiceFile}
-              className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white font-bold py-3 px-4 rounded-lg flex items-center justify-center gap-2 transition-colors"
+              className="w-full bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white text-sm font-semibold py-2.5 px-4 rounded-lg flex items-center justify-center gap-2 transition-colors"
             >
-              {loading ? (
-                <>
-                  <Loader2 className="w-5 h-5 animate-spin" />
-                  Processing...
-                </>
-              ) : (
-                <>
-                  <Upload className="w-5 h-5" />
-                  Upload & Validate
-                </>
-              )}
+              {loading ? <><Loader2 className="w-4 h-4 animate-spin" /> Processing...</> : <><Upload className="w-4 h-4" /> Upload & Validate</>}
             </button>
           </form>
         </div>
 
         {/* Result Panel */}
-        <div className="bg-white rounded-xl shadow-sm p-6">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">Processing Result</h2>
-          
+        <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-6">
+          <h2 className="text-sm font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-5">Processing Result</h2>
+
           {!result && !loading && (
-            <div className="text-center py-12 text-gray-400">
-              <FileText className="w-16 h-16 mx-auto mb-4" />
-              <p>Upload an invoice to see results</p>
+            <div className="text-center py-16">
+              <FileText className="w-10 h-10 mx-auto text-slate-200 mb-3" />
+              <p className="text-sm text-slate-400 dark:text-slate-500">Upload an invoice to see results</p>
             </div>
           )}
 
           {loading && (
-            <div className="text-center py-12">
-              <Loader2 className="w-16 h-16 mx-auto mb-4 text-blue-500 animate-spin" />
-              <p className="text-gray-600">Processing invoice...</p>
+            <div className="text-center py-16">
+              <Loader2 className="w-10 h-10 mx-auto text-indigo-500 animate-spin mb-3" />
+              <p className="text-sm text-slate-500 dark:text-slate-400">Processing invoice...</p>
             </div>
           )}
 
           {result && (
-            <div>
+            <div className="space-y-4">
               {/* Status Badge */}
-              <div className={`flex items-center gap-2 p-4 rounded-lg mb-4 ${
-                result.status === 'processed_and_saved' 
-                  ? 'bg-green-50 text-green-800'
+              <div className={`flex items-center gap-2.5 px-4 py-3 rounded-lg border text-sm font-medium ${
+                result.status === 'processed_and_saved'
+                  ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
                   : result.status === 'validation_failed'
-                  ? 'bg-yellow-50 text-yellow-800'
-                  : 'bg-red-50 text-red-800'
+                  ? 'bg-amber-50 border-amber-200 text-amber-800'
+                  : 'bg-red-50 border-red-200 text-red-800'
               }`}>
-                {result.status === 'processed_and_saved' ? (
-                  <CheckCircle className="w-6 h-6" />
-                ) : result.status === 'validation_failed' ? (
-                  <AlertTriangle className="w-6 h-6" />
-                ) : (
-                  <XCircle className="w-6 h-6" />
-                )}
-                <span className="font-semibold capitalize">
-                  {result.status?.replace(/_/g, ' ')}
-                </span>
+                {result.status === 'processed_and_saved' ? <CheckCircle className="w-4 h-4" />
+                  : result.status === 'validation_failed' ? <AlertTriangle className="w-4 h-4" />
+                  : <XCircle className="w-4 h-4" />}
+                {result.status?.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
               </div>
 
-              {/* Errors */}
-              {result.errors && result.errors.length > 0 && (
-                <div className="mb-4">
-                  <h3 className="font-medium text-red-800 mb-2">Validation Errors:</h3>
-                  <ul className="space-y-2">
-                    {result.errors.map((error, index) => (
-                      <li key={index} className="text-sm text-red-600 bg-red-50 p-2 rounded">
-                        {error}
-                      </li>
+              {/* Validation Errors */}
+              {result.errors?.length > 0 && (
+                <div>
+                  <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2">Validation Errors</p>
+                  <ul className="space-y-1.5">
+                    {result.errors.map((error, i) => (
+                      <li key={i} className="text-xs text-red-700 bg-red-50 border border-red-100 px-3 py-2 rounded-lg">{error}</li>
                     ))}
                   </ul>
                 </div>
               )}
 
-              {/* Error Message */}
+              {/* System Error */}
               {result.status === 'error' && result.message && (
-                <div className="mb-4">
-                  <h3 className="font-medium text-red-800 mb-2">Error Details:</h3>
-                  <div className="text-sm text-red-600 bg-red-50 p-3 rounded">
-                    <p className="font-medium mb-2">{result.message}</p>
-                    {result.error_details && (
-                      <details className="mt-2">
-                        <summary className="cursor-pointer text-red-500 hover:text-red-700">
-                          Show technical details
-                        </summary>
-                        <pre className="mt-2 text-xs bg-red-100 p-2 rounded overflow-auto">
-                          {JSON.stringify(result.error_details, null, 2)}
-                        </pre>
-                      </details>
-                    )}
-                  </div>
+                <div className="text-sm bg-red-50 border border-red-200 rounded-lg p-3">
+                  <p className="font-medium text-red-800 mb-1">{result.message}</p>
+                  {result.error_details && (
+                    <details className="mt-1">
+                      <summary className="cursor-pointer text-xs text-red-500">Show technical details</summary>
+                      <pre className="mt-2 text-xs bg-red-100 p-2 rounded overflow-auto">{JSON.stringify(result.error_details, null, 2)}</pre>
+                    </details>
+                  )}
                 </div>
               )}
 
-              {/* Success Info */}
+              {/* Success — download + approval */}
               {result.status === 'processed_and_saved' && (
                 <div className="space-y-3">
                   {result.download_url && (
-                    <a
-                      href={result.download_url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="block w-full bg-green-600 hover:bg-green-700 text-white text-center font-bold py-2 px-4 rounded-lg"
-                    >
-                      Download Signed Invoice
+                    <a href={result.download_url} target="_blank" rel="noopener noreferrer"
+                      className="flex items-center justify-center gap-2 w-full bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold py-2.5 px-4 rounded-lg transition-colors">
+                      <FileText className="w-4 h-4" /> Download Signed Invoice
                     </a>
                   )}
-                  
                   {result.approval && (
-                    <div className="bg-blue-50 p-4 rounded-lg">
-                      <h4 className="font-medium text-blue-800 mb-2">Approval Status</h4>
-                      <p className="text-sm text-blue-600">
-                        Status: {result.approval.status}<br />
-                        Level: {result.approval.level}<br />
-                        Approver: {result.approval.current_approver}
-                      </p>
+                    <div className="bg-slate-50 dark:bg-slate-700/50 border border-slate-200 dark:border-slate-600 rounded-lg p-4 text-sm text-slate-600 dark:text-slate-300 space-y-1">
+                      <p className="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-2">Approval Status</p>
+                      <p>Status: <span className="font-medium text-slate-800 dark:text-slate-100">{result.approval.status}</span></p>
+                      <p>Level: <span className="font-medium text-slate-800 dark:text-slate-100">{result.approval.level}</span></p>
+                      <p>Approver: <span className="font-medium text-slate-800 dark:text-slate-100">{result.approval.current_approver}</span></p>
                     </div>
                   )}
                 </div>
@@ -290,33 +244,28 @@ function UploadInvoice() {
 
               {/* Fraud Analysis */}
               {result.fraud_analysis && (
-                <div className={`mt-4 p-4 rounded-lg ${
-                  result.fraud_analysis.risk_level === 'HIGH' 
-                    ? 'bg-red-50' 
-                    : result.fraud_analysis.risk_level === 'MEDIUM'
-                    ? 'bg-yellow-50'
-                    : 'bg-green-50'
-                }`}>
-                  <h4 className="font-medium mb-2">Fraud Analysis</h4>
-                  <p className="text-sm">
-                    Risk Level: <span className="font-bold">{result.fraud_analysis.risk_level}</span><br />
-                    Score: {result.fraud_analysis.fraud_score}
-                  </p>
+                <div className="bg-slate-50 dark:bg-slate-700/50 border border-slate-200 dark:border-slate-600 rounded-lg p-4">
+                  <p className="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-2">Fraud Analysis</p>
+                  <div className="flex items-center gap-3">
+                    <span className={`text-xs font-bold px-2 py-1 rounded-full ${
+                      result.fraud_analysis.risk_level === 'HIGH' ? 'bg-red-100 text-red-700'
+                      : result.fraud_analysis.risk_level === 'MEDIUM' ? 'bg-amber-100 text-amber-700'
+                      : 'bg-emerald-100 text-emerald-700'
+                    }`}>{result.fraud_analysis.risk_level}</span>
+                    <span className="text-sm text-slate-600 dark:text-slate-300">Score: <span className="font-semibold">{result.fraud_analysis.fraud_score}</span></span>
+                  </div>
                   {result.fraud_analysis.flags?.length > 0 && (
-                    <ul className="mt-2 text-sm">
+                    <ul className="mt-2 space-y-1">
                       {result.fraud_analysis.flags.map((flag, i) => (
-                        <li key={i} className="text-red-600">• {flag}</li>
+                        <li key={i} className="text-xs text-red-600">• {flag}</li>
                       ))}
                     </ul>
                   )}
                 </div>
               )}
 
-              {/* Reset Button */}
-              <button
-                onClick={resetForm}
-                className="w-full mt-4 bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-2 px-4 rounded-lg"
-              >
+              <button onClick={resetForm}
+                className="w-full border border-slate-200 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 text-sm font-medium py-2.5 px-4 rounded-lg transition-colors">
                 Upload Another Invoice
               </button>
             </div>

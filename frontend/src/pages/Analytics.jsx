@@ -27,15 +27,15 @@ function Analytics() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+        <div className="animate-spin rounded-full h-8 w-8 border-2 border-slate-200 border-t-indigo-600"></div>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="bg-red-50 border border-red-200 rounded-lg p-6">
-        <p className="text-red-600">{error}</p>
+      <div className="bg-white border border-red-200 rounded-xl p-5 flex items-center gap-3">
+        <p className="text-sm text-red-600">{error}</p>
       </div>
     );
   }
@@ -43,280 +43,182 @@ function Analytics() {
   const summary = data?.summary?.summary || {};
   const charts = data?.charts || {};
 
+  const noData = <p className="text-sm text-slate-400 text-center py-10">No data available</p>;
+
   return (
     <div>
       <div className="flex justify-between items-center mb-8">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Analytics Dashboard</h1>
-          <p className="text-gray-500 mt-1">Visual insights into your invoice data</p>
+          <h1 className="text-xl font-bold text-slate-800 dark:text-slate-100">Analytics</h1>
+          <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">Visual insights into your invoice data</p>
         </div>
-        <button
-          onClick={fetchData}
-          className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-        >
-          <RefreshCw className="w-4 h-4" />
-          Refresh
+        <button onClick={fetchData} className="flex items-center gap-2 px-3 py-2 text-sm font-medium border border-slate-200 dark:border-slate-700 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-400 transition-colors">
+          <RefreshCw className="w-4 h-4" /> Refresh
         </button>
       </div>
 
-      {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-        <div className="bg-white rounded-xl shadow-sm p-6">
-          <div className="flex items-center gap-3">
-            <div className="p-3 bg-blue-100 rounded-lg">
-              <BarChart3 className="w-6 h-6 text-blue-600" />
-            </div>
-            <div>
-              <p className="text-sm text-gray-500">Total Invoices</p>
-              <p className="text-2xl font-bold">{summary.total_invoices || 0}</p>
-            </div>
+      {/* Summary Stats */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+        {[
+          { label: 'Total Invoices', value: summary.total_invoices || 0 },
+          { label: 'Total Amount', value: `$${(summary.total_amount_processed || 0).toLocaleString()}` },
+          { label: 'Tax Collected', value: `$${(summary.total_tax_collected || 0).toLocaleString()}` },
+          { label: 'Countries', value: summary.unique_countries || 0 },
+        ].map(({ label, value }) => (
+          <div key={label} className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-5">
+            <p className="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider">{label}</p>
+            <p className="text-2xl font-bold text-slate-800 dark:text-slate-100 mt-2">{value}</p>
           </div>
-        </div>
-        <div className="bg-white rounded-xl shadow-sm p-6">
-          <div className="flex items-center gap-3">
-            <div className="p-3 bg-green-100 rounded-lg">
-              <DollarSign className="w-6 h-6 text-green-600" />
-            </div>
-            <div>
-              <p className="text-sm text-gray-500">Total Amount</p>
-              <p className="text-2xl font-bold">${(summary.total_amount_processed || 0).toLocaleString()}</p>
-            </div>
-          </div>
-        </div>
-        <div className="bg-white rounded-xl shadow-sm p-6">
-          <div className="flex items-center gap-3">
-            <div className="p-3 bg-purple-100 rounded-lg">
-              <TrendingUp className="w-6 h-6 text-purple-600" />
-            </div>
-            <div>
-              <p className="text-sm text-gray-500">Tax Collected</p>
-              <p className="text-2xl font-bold">${(summary.total_tax_collected || 0).toLocaleString()}</p>
-            </div>
-          </div>
-        </div>
-        <div className="bg-white rounded-xl shadow-sm p-6">
-          <div className="flex items-center gap-3">
-            <div className="p-3 bg-yellow-100 rounded-lg">
-              <PieChart className="w-6 h-6 text-yellow-600" />
-            </div>
-            <div>
-              <p className="text-sm text-gray-500">Countries</p>
-              <p className="text-2xl font-bold">{summary.unique_countries || 0}</p>
-            </div>
-          </div>
-        </div>
+        ))}
       </div>
 
       {/* Charts Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
+
         {/* By Country */}
-        <div className="bg-white rounded-xl shadow-sm p-6">
-          <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-            <BarChart3 className="w-5 h-5 text-blue-500" />
-            Invoices by Country
-          </h3>
+        <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-6">
+          <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-4">By Country</h3>
           {charts.by_country?.data?.length > 0 ? (
             <div className="space-y-3">
-              {charts.by_country.data.map((item, index) => (
-                <div key={index} className="flex items-center gap-3">
-                  <div className="w-24 text-sm font-medium text-gray-600 capitalize">
-                    {item.country}
-                  </div>
-                  <div className="flex-1 bg-gray-200 rounded-full h-6 overflow-hidden">
-                    <div
-                      className="bg-blue-500 h-full rounded-full flex items-center justify-end pr-2"
-                      style={{
-                        width: `${Math.min(100, (item.total_amount / (charts.by_country.data[0]?.total_amount || 1)) * 100)}%`
-                      }}
-                    >
-                      <span className="text-xs text-white font-medium">
-                        ${item.total_amount.toLocaleString()}
-                      </span>
-                    </div>
-                  </div>
-                  <div className="w-16 text-sm text-gray-500 text-right">
-                    {item.invoice_count} inv
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <p className="text-gray-400 text-center py-8">No data available</p>
-          )}
-        </div>
-
-        {/* By Category */}
-        <div className="bg-white rounded-xl shadow-sm p-6">
-          <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-            <PieChart className="w-5 h-5 text-purple-500" />
-            Invoices by Product Category
-          </h3>
-          {charts.by_category?.data?.length > 0 ? (
-            <div className="space-y-3">
-              {charts.by_category.data.map((item, index) => {
-                const colors = ['bg-blue-500', 'bg-green-500', 'bg-purple-500', 'bg-yellow-500', 'bg-red-500', 'bg-pink-500'];
+              {charts.by_country.data.map((item, i) => {
+                const pct = Math.min(100, (item.total_amount / (charts.by_country.data[0]?.total_amount || 1)) * 100);
                 return (
-                  <div key={index} className="flex items-center gap-3">
-                    <div className={`w-3 h-3 rounded-full ${colors[index % colors.length]}`}></div>
-                    <div className="flex-1 text-sm font-medium text-gray-600 capitalize">
-                      {item.category?.replace(/_/g, ' ')}
+                  <div key={i} className="flex items-center gap-3">
+                    <span className="w-20 text-xs font-medium text-slate-600 dark:text-slate-300 capitalize truncate">{item.country}</span>
+                    <div className="flex-1 bg-slate-100 dark:bg-slate-700 rounded-full h-2">
+                      <div className="bg-indigo-500 h-2 rounded-full" style={{ width: `${pct}%` }} />
                     </div>
-                    <div className="text-sm text-gray-500">
-                      {item.item_count} items
-                    </div>
-                    <div className="text-sm font-semibold">
-                      ${item.total_amount?.toLocaleString()}
-                    </div>
+                    <span className="text-xs text-slate-500 dark:text-slate-400 w-24 text-right">${item.total_amount.toLocaleString()}</span>
+                    <span className="text-xs text-slate-400 dark:text-slate-500 w-10 text-right">{item.invoice_count}</span>
                   </div>
                 );
               })}
             </div>
-          ) : (
-            <p className="text-gray-400 text-center py-8">No data available</p>
-          )}
+          ) : noData}
+        </div>
+
+        {/* By Category */}
+        <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-6">
+          <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-4">By Product Category</h3>
+          {charts.by_category?.data?.length > 0 ? (
+            <div className="space-y-3">
+              {charts.by_category.data.map((item, i) => (
+                <div key={i} className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 rounded-full bg-indigo-400" style={{ opacity: 1 - i * 0.12 }} />
+                    <span className="text-sm text-slate-700 dark:text-slate-300 capitalize">{item.category?.replace(/_/g, ' ')}</span>
+                  </div>
+                  <div className="flex items-center gap-4">
+                    <span className="text-xs text-slate-400 dark:text-slate-500">{item.item_count} items</span>
+                    <span className="text-sm font-semibold text-slate-800 dark:text-slate-100">${item.total_amount?.toLocaleString()}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : noData}
         </div>
 
         {/* By Month */}
-        <div className="bg-white rounded-xl shadow-sm p-6">
-          <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-            <TrendingUp className="w-5 h-5 text-green-500" />
-            Invoices by Month
-          </h3>
+        <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-6">
+          <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-4">By Month</h3>
           {charts.by_month?.data?.length > 0 ? (
             <div className="space-y-3">
-              {charts.by_month.data.slice(-6).map((item, index) => (
-                <div key={index} className="flex items-center gap-3">
-                  <div className="w-20 text-sm font-medium text-gray-600">
-                    {item.month}
-                  </div>
-                  <div className="flex-1 bg-gray-200 rounded-full h-6 overflow-hidden">
-                    <div
-                      className="bg-green-500 h-full rounded-full flex items-center justify-end pr-2"
-                      style={{
-                        width: `${Math.min(100, (item.total_amount / (Math.max(...charts.by_month.data.map(d => d.total_amount)) || 1)) * 100)}%`
-                      }}
-                    >
-                      <span className="text-xs text-white font-medium">
-                        ${item.total_amount.toLocaleString()}
-                      </span>
+              {charts.by_month.data.slice(-6).map((item, i) => {
+                const maxVal = Math.max(...charts.by_month.data.map(d => d.total_amount)) || 1;
+                const pct = Math.min(100, (item.total_amount / maxVal) * 100);
+                return (
+                  <div key={i} className="flex items-center gap-3">
+                    <span className="w-16 text-xs font-medium text-slate-600 dark:text-slate-300">{item.month}</span>
+                    <div className="flex-1 bg-slate-100 dark:bg-slate-700 rounded-full h-2">
+                      <div className="bg-indigo-500 h-2 rounded-full" style={{ width: `${pct}%` }} />
                     </div>
+                    <span className="text-xs text-slate-500 dark:text-slate-400 w-24 text-right">${item.total_amount.toLocaleString()}</span>
+                    <span className="text-xs text-slate-400 dark:text-slate-500 w-6 text-right">{item.invoice_count}</span>
                   </div>
-                  <div className="w-12 text-sm text-gray-500 text-right">
-                    {item.invoice_count}
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
-          ) : (
-            <p className="text-gray-400 text-center py-8">No data available</p>
-          )}
+          ) : noData}
         </div>
 
         {/* Tax by Product */}
-        <div className="bg-white rounded-xl shadow-sm p-6">
-          <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-            <DollarSign className="w-5 h-5 text-yellow-500" />
-            Tax Collected by Product
-          </h3>
+        <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-6">
+          <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-4">Tax by Product</h3>
           {charts.tax_by_product?.data?.length > 0 ? (
-            <div className="space-y-3">
-              {charts.tax_by_product.data.slice(0, 6).map((item, index) => (
-                <div key={index} className="flex items-center justify-between p-2 bg-gray-50 rounded">
+            <div className="space-y-2">
+              {charts.tax_by_product.data.slice(0, 6).map((item, i) => (
+                <div key={i} className="flex items-center justify-between px-3 py-2.5 bg-slate-50 dark:bg-slate-700/50 rounded-lg">
                   <div>
-                    <span className="text-sm font-medium capitalize">
-                      {item.category?.replace(/_/g, ' ')}
-                    </span>
-                    {item.hs_code && (
-                      <span className="text-xs text-gray-400 ml-2">
-                        HS: {item.hs_code}
-                      </span>
-                    )}
+                    <span className="text-sm font-medium text-slate-700 dark:text-slate-300 capitalize">{item.category?.replace(/_/g, ' ')}</span>
+                    {item.hs_code && <span className="text-xs text-slate-400 dark:text-slate-500 ml-2">HS {item.hs_code}</span>}
                   </div>
-                  <div className="text-right">
-                    <span className="text-sm font-bold text-green-600">
-                      ${item.total_tax_collected?.toLocaleString()}
-                    </span>
-                    <span className="text-xs text-gray-400 ml-2">
-                      ({item.avg_tax_rate}%)
-                    </span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-slate-400 dark:text-slate-500">{item.avg_tax_rate}%</span>
+                    <span className="text-sm font-bold text-slate-800 dark:text-slate-100">${item.total_tax_collected?.toLocaleString()}</span>
                   </div>
                 </div>
               ))}
             </div>
-          ) : (
-            <p className="text-gray-400 text-center py-8">No data available</p>
-          )}
+          ) : noData}
         </div>
       </div>
 
       {/* Tables */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* Top Vendors */}
-        <div className="bg-white rounded-xl shadow-sm p-6">
-          <h3 className="text-lg font-semibold mb-4">Top Vendors</h3>
+        <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-6">
+          <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-4">Top Vendors</h3>
           {charts.top_vendors?.data?.length > 0 ? (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b">
-                    <th className="text-left py-2">Vendor</th>
-                    <th className="text-right py-2">Invoices</th>
-                    <th className="text-right py-2">Amount</th>
-                    <th className="text-right py-2">Risk</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {charts.top_vendors.data.map((vendor, index) => (
-                    <tr key={index} className="border-b">
-                      <td className="py-2 font-medium">{vendor.vendor_name}</td>
-                      <td className="py-2 text-right">{vendor.total_invoices}</td>
-                      <td className="py-2 text-right">${vendor.total_amount?.toLocaleString()}</td>
-                      <td className="py-2 text-right">
-                        <span className={`px-2 py-1 rounded text-xs ${
-                          vendor.risk_score >= 70 ? 'bg-red-100 text-red-800' :
-                          vendor.risk_score >= 40 ? 'bg-yellow-100 text-yellow-800' :
-                          'bg-green-100 text-green-800'
-                        }`}>
-                          {vendor.risk_score}
-                        </span>
-                      </td>
-                    </tr>
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-slate-100">
+                  {['Vendor','Invoices','Amount','Risk'].map(h => (
+                    <th key={h} className="text-xs font-semibold text-slate-400 uppercase tracking-wider text-left py-2 last:text-right">{h}</th>
                   ))}
-                </tbody>
-              </table>
-            </div>
-          ) : (
-            <p className="text-gray-400 text-center py-8">No vendors tracked yet</p>
-          )}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-50 dark:divide-slate-700">
+                {charts.top_vendors.data.map((v, i) => (
+                  <tr key={i} className="hover:bg-slate-50 dark:hover:bg-slate-700/50">
+                    <td className="py-2.5 font-medium text-slate-800 dark:text-slate-100">{v.vendor_name}</td>
+                    <td className="py-2.5 text-slate-500 dark:text-slate-400">{v.total_invoices}</td>
+                    <td className="py-2.5 text-slate-700 dark:text-slate-300">${v.total_amount?.toLocaleString()}</td>
+                    <td className="py-2.5 text-right">
+                      <span className={`text-xs font-semibold px-2 py-1 rounded-full ${
+                        v.risk_score >= 70 ? 'bg-red-50 text-red-700' :
+                        v.risk_score >= 40 ? 'bg-amber-50 text-amber-700' :
+                        'bg-emerald-50 text-emerald-700'}`}>{v.risk_score}</span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          ) : noData}
         </div>
 
         {/* Top Importers */}
-        <div className="bg-white rounded-xl shadow-sm p-6">
-          <h3 className="text-lg font-semibold mb-4">Top Importers</h3>
+        <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-6">
+          <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-4">Top Importers</h3>
           {charts.top_importers?.data?.length > 0 ? (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b">
-                    <th className="text-left py-2">Importer</th>
-                    <th className="text-right py-2">Invoices</th>
-                    <th className="text-right py-2">Total Amount</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {charts.top_importers.data.map((importer, index) => (
-                    <tr key={index} className="border-b">
-                      <td className="py-2 font-medium">{importer.importer_name}</td>
-                      <td className="py-2 text-right">{importer.invoice_count}</td>
-                      <td className="py-2 text-right">${importer.total_amount?.toLocaleString()}</td>
-                    </tr>
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-slate-100">
+                  {['Importer','Invoices','Total Amount'].map(h => (
+                    <th key={h} className="text-xs font-semibold text-slate-400 uppercase tracking-wider text-left py-2 last:text-right">{h}</th>
                   ))}
-                </tbody>
-              </table>
-            </div>
-          ) : (
-            <p className="text-gray-400 text-center py-8">No importers tracked yet</p>
-          )}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-50 dark:divide-slate-700">
+                {charts.top_importers.data.map((imp, i) => (
+                  <tr key={i} className="hover:bg-slate-50 dark:hover:bg-slate-700/50">
+                    <td className="py-2.5 font-medium text-slate-800 dark:text-slate-100">{imp.importer_name}</td>
+                    <td className="py-2.5 text-slate-500 dark:text-slate-400">{imp.invoice_count}</td>
+                    <td className="py-2.5 text-right font-medium text-slate-800 dark:text-slate-100">${imp.total_amount?.toLocaleString()}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          ) : noData}
         </div>
       </div>
     </div>

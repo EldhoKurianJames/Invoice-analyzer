@@ -61,8 +61,18 @@ def parse_invoice(text: str) -> Dict[str, Any]:
         name_match = re.match(r'^([A-Za-z\s]+)', name_part)
         item_description = name_match.group(1).strip() if name_match else name_part
         
-        # Skip header rows
-        if item_description.lower() in ['item', 'description', 'item description', 'item de', 'scription']:
+        # Skip header rows and invoice metadata fields mistaken for products
+        SKIP_DESCRIPTIONS = {
+            'item', 'description', 'item description', 'item de', 'scription',
+            'invoice', 'invoice id', 'invoice no', 'invoice number', 'invoice date',
+            'date', 'due date', 'bill to', 'ship to', 'exporter', 'importer',
+            'customer', 'vendor', 'total', 'subtotal', 'tax', 'grand total',
+            'page', 'ref', 'reference', 'po number', 'order',
+        }
+        if item_description.lower().strip() in SKIP_DESCRIPTIONS:
+            continue
+        # Also skip if the description starts with "invoice" (catches "Invoice ID", "Invoice No", etc.)
+        if re.match(r'^invoice\b', item_description.lower().strip()):
             continue
         
         # Extract tax percentage

@@ -74,7 +74,7 @@ function Approvals() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+        <div className="animate-spin rounded-full h-8 w-8 border-2 border-slate-200 border-t-indigo-600"></div>
       </div>
     );
   }
@@ -88,113 +88,73 @@ function Approvals() {
     <div>
       <div className="flex justify-between items-center mb-8">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Approval Workflow</h1>
-          <p className="text-gray-500 mt-1">Review and approve pending invoices</p>
+          <h1 className="text-xl font-bold text-slate-800 dark:text-slate-100">Approval Workflow</h1>
+          <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">Review and approve pending invoices</p>
         </div>
-        <button
-          onClick={fetchData}
-          className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-        >
-          <RefreshCw className="w-4 h-4" />
-          Refresh
+        <button onClick={fetchData} className="flex items-center gap-2 px-3 py-2 text-sm font-medium border border-slate-200 dark:border-slate-700 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-400 transition-colors">
+          <RefreshCw className="w-4 h-4" /> Refresh
         </button>
       </div>
 
       {/* Approver Name Input */}
-      <div className="bg-white rounded-xl shadow-sm p-4 mb-6">
-        <div className="flex items-center gap-4">
-          <User className="w-5 h-5 text-gray-400" />
-          <input
-            type="text"
-            placeholder="Enter your name (required for approvals)"
-            value={approverName}
-            onChange={(e) => setApproverName(e.target.value)}
-            className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-          />
-        </div>
+      <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-4 mb-5 flex items-center gap-3">
+        <User className="w-4 h-4 text-slate-400 flex-shrink-0" />
+        <input
+          type="text"
+          placeholder="Enter your name to approve or reject invoices"
+          value={approverName}
+          onChange={(e) => setApproverName(e.target.value)}
+          className="flex-1 text-sm px-3 py-2 border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+        />
       </div>
 
-      {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-        <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-6">
-          <div className="flex items-center gap-3">
-            <Clock className="w-8 h-8 text-yellow-600" />
-            <div>
-              <p className="text-sm text-yellow-700">Pending</p>
-              <p className="text-3xl font-bold text-yellow-800">{summary.total_pending || 0}</p>
-            </div>
+      {/* Summary Stats */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-5">
+        {[
+          { label: 'Pending', value: summary.total_pending || 0, icon: Clock },
+          { label: 'Approved', value: summary.total_approved || 0, icon: CheckCircle },
+          { label: 'Rejected', value: summary.total_rejected || 0, icon: XCircle },
+          { label: 'Overdue', value: summary.overdue_count || 0, icon: AlertTriangle },
+        ].map(({ label, value, icon: Icon }) => (
+          <div key={label} className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-5">
+            <p className="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider">{label}</p>
+            <p className="text-2xl font-bold text-slate-800 dark:text-slate-100 mt-2">{value}</p>
           </div>
-        </div>
-        <div className="bg-green-50 border border-green-200 rounded-xl p-6">
-          <div className="flex items-center gap-3">
-            <CheckCircle className="w-8 h-8 text-green-600" />
-            <div>
-              <p className="text-sm text-green-700">Approved</p>
-              <p className="text-3xl font-bold text-green-800">{summary.total_approved || 0}</p>
-            </div>
-          </div>
-        </div>
-        <div className="bg-red-50 border border-red-200 rounded-xl p-6">
-          <div className="flex items-center gap-3">
-            <XCircle className="w-8 h-8 text-red-600" />
-            <div>
-              <p className="text-sm text-red-700">Rejected</p>
-              <p className="text-3xl font-bold text-red-800">{summary.total_rejected || 0}</p>
-            </div>
-          </div>
-        </div>
-        <div className="bg-orange-50 border border-orange-200 rounded-xl p-6">
-          <div className="flex items-center gap-3">
-            <AlertTriangle className="w-8 h-8 text-orange-600" />
-            <div>
-              <p className="text-sm text-orange-700">Overdue</p>
-              <p className="text-3xl font-bold text-orange-800">{summary.overdue_count || 0}</p>
-            </div>
-          </div>
-        </div>
+        ))}
       </div>
 
       {/* Pending by Level */}
-      <div className="bg-white rounded-xl shadow-sm p-6 mb-8">
-        <h2 className="text-lg font-semibold mb-4">Pending by Approval Level</h2>
-        <div className="grid grid-cols-3 gap-4">
-          <div className="text-center p-4 bg-blue-50 rounded-lg">
-            <p className="text-2xl font-bold text-blue-600">{pendingByLevel.Manager || 0}</p>
-            <p className="text-sm text-blue-800">Manager</p>
-            <p className="text-xs text-gray-500">All invoices</p>
-          </div>
-          <div className="text-center p-4 bg-purple-50 rounded-lg">
-            <p className="text-2xl font-bold text-purple-600">{pendingByLevel.Finance || 0}</p>
-            <p className="text-sm text-purple-800">Finance</p>
-            <p className="text-xs text-gray-500">&gt; $50,000</p>
-          </div>
-          <div className="text-center p-4 bg-red-50 rounded-lg">
-            <p className="text-2xl font-bold text-red-600">{pendingByLevel.Compliance || 0}</p>
-            <p className="text-sm text-red-800">Compliance</p>
-            <p className="text-xs text-gray-500">&gt; $100,000 or High Risk</p>
-          </div>
+      <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-6 mb-5">
+        <h2 className="text-sm font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-4">Pending by Approval Level</h2>
+        <div className="grid grid-cols-3 gap-3">
+          {[
+            { level: 'Manager', count: pendingByLevel.Manager || 0, sub: 'All invoices' },
+            { level: 'Finance', count: pendingByLevel.Finance || 0, sub: '> $50,000' },
+            { level: 'Compliance', count: pendingByLevel.Compliance || 0, sub: '> $100,000 or High Risk' },
+          ].map(({ level, count, sub }) => (
+            <div key={level} className="text-center p-4 bg-slate-50 dark:bg-slate-700/50 border border-slate-100 dark:border-slate-700 rounded-lg">
+              <p className="text-2xl font-bold text-slate-800 dark:text-slate-100">{count}</p>
+              <p className="text-sm font-medium text-slate-700 dark:text-slate-300 mt-1">{level}</p>
+              <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">{sub}</p>
+            </div>
+          ))}
         </div>
       </div>
 
       {/* Overdue Approvals */}
       {overdueApprovals.length > 0 && (
-        <div className="bg-orange-50 border border-orange-200 rounded-xl p-6 mb-8">
-          <h2 className="text-lg font-semibold text-orange-800 mb-4 flex items-center gap-2">
-            <AlertTriangle className="w-5 h-5" />
-            Overdue Approvals (Waiting &gt; 3 days)
+        <div className="bg-white border border-amber-200 rounded-xl p-5 mb-5">
+          <h2 className="text-sm font-semibold text-amber-700 uppercase tracking-wider mb-3 flex items-center gap-2">
+            <AlertTriangle className="w-4 h-4" /> Overdue — Waiting &gt; 3 days
           </h2>
           <div className="space-y-2">
             {overdueApprovals.map((approval) => (
-              <div key={approval.id} className="flex items-center justify-between bg-white p-3 rounded-lg">
+              <div key={approval.id} className="flex items-center justify-between bg-amber-50 px-4 py-2.5 rounded-lg">
                 <div>
-                  <span className="font-medium">{approval.invoice_id}</span>
-                  <span className="text-sm text-gray-500 ml-2">
-                    {approval.vendor_name} - ${approval.total_amount?.toLocaleString()}
-                  </span>
+                  <span className="text-sm font-medium text-slate-800">{approval.invoice_id}</span>
+                  <span className="text-xs text-slate-500 dark:text-slate-400 ml-2">{approval.vendor_name} · ${approval.total_amount?.toLocaleString()}</span>
                 </div>
-                <span className="text-orange-600 font-medium">
-                  {approval.waiting_days} days waiting
-                </span>
+                <span className="text-xs font-semibold text-amber-700">{approval.waiting_days}d overdue</span>
               </div>
             ))}
           </div>
@@ -202,69 +162,54 @@ function Approvals() {
       )}
 
       {/* Pending Approvals Table */}
-      <div className="bg-white rounded-xl shadow-sm p-6">
-        <h2 className="text-lg font-semibold mb-4">Pending Approvals</h2>
+      <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-6">
+        <h2 className="text-sm font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-4">Pending Approvals</h2>
         {pendingApprovals.length > 0 ? (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b bg-gray-50">
-                  <th className="text-left py-3 px-4">Invoice ID</th>
-                  <th className="text-left py-3 px-4">Vendor</th>
-                  <th className="text-left py-3 px-4">Country</th>
-                  <th className="text-right py-3 px-4">Amount</th>
-                  <th className="text-center py-3 px-4">Level</th>
-                  <th className="text-center py-3 px-4">Risk</th>
-                  <th className="text-center py-3 px-4">Waiting</th>
-                  <th className="text-center py-3 px-4">Actions</th>
+                <tr className="border-b border-slate-100">
+                  {['Invoice ID','Vendor','Country','Amount','Level','Risk','Waiting','Actions'].map(h => (
+                    <th key={h} className="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider text-left py-3 px-3">{h}</th>
+                  ))}
                 </tr>
               </thead>
-              <tbody>
+              <tbody className="divide-y divide-slate-50 dark:divide-slate-700">
                 {pendingApprovals.map((approval) => (
-                  <tr key={approval.id} className="border-b hover:bg-gray-50">
-                    <td className="py-3 px-4 font-medium">{approval.invoice_id}</td>
-                    <td className="py-3 px-4">{approval.vendor_name || '-'}</td>
-                    <td className="py-3 px-4 capitalize">{approval.country || '-'}</td>
-                    <td className="py-3 px-4 text-right">
-                      ${approval.total_amount?.toLocaleString() || 0}
-                    </td>
-                    <td className="py-3 px-4 text-center">
-                      <span className={`px-2 py-1 rounded text-xs font-medium ${
-                        approval.level === 3 ? 'bg-red-100 text-red-800' :
-                        approval.level === 2 ? 'bg-purple-100 text-purple-800' :
-                        'bg-blue-100 text-blue-800'
-                      }`}>
+                  <tr key={approval.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors">
+                    <td className="py-3 px-3 font-medium text-slate-800 dark:text-slate-100">{approval.invoice_id}</td>
+                    <td className="py-3 px-3 text-slate-600 dark:text-slate-300">{approval.vendor_name || '—'}</td>
+                    <td className="py-3 px-3 text-slate-600 dark:text-slate-300 capitalize">{approval.country || '—'}</td>
+                    <td className="py-3 px-3 font-medium text-slate-800 dark:text-slate-100">${approval.total_amount?.toLocaleString() || 0}</td>
+                    <td className="py-3 px-3">
+                      <span className={`text-xs font-semibold px-2 py-1 rounded-full ${
+                        approval.level === 3 ? 'bg-red-50 text-red-700' :
+                        approval.level === 2 ? 'bg-indigo-50 text-indigo-700' :
+                        'bg-slate-100 text-slate-600'}`}>
                         {approval.level_name}
                       </span>
                     </td>
-                    <td className="py-3 px-4 text-center">
+                    <td className="py-3 px-3">
                       {approval.fraud_score !== null && (
-                        <span className={`px-2 py-1 rounded text-xs ${
-                          approval.fraud_score >= 70 ? 'bg-red-100 text-red-800' :
-                          approval.fraud_score >= 40 ? 'bg-yellow-100 text-yellow-800' :
-                          'bg-green-100 text-green-800'
-                        }`}>
+                        <span className={`text-xs font-semibold px-2 py-1 rounded-full ${
+                          approval.fraud_score >= 70 ? 'bg-red-50 text-red-700' :
+                          approval.fraud_score >= 40 ? 'bg-amber-50 text-amber-700' :
+                          'bg-emerald-50 text-emerald-700'}`}>
                           {approval.fraud_score?.toFixed(0)}
                         </span>
                       )}
                     </td>
-                    <td className="py-3 px-4 text-center text-gray-500">
-                      {approval.waiting_days}d
-                    </td>
-                    <td className="py-3 px-4 text-center">
-                      <div className="flex items-center justify-center gap-2">
-                        <button
-                          onClick={() => setShowModal({ type: 'approve', approval })}
+                    <td className="py-3 px-3 text-xs text-slate-400 dark:text-slate-500">{approval.waiting_days}d</td>
+                    <td className="py-3 px-3">
+                      <div className="flex items-center gap-1.5">
+                        <button onClick={() => setShowModal({ type: 'approve', approval })}
                           disabled={actionLoading === approval.id}
-                          className="px-3 py-1 bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50 text-xs"
-                        >
+                          className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium rounded-lg disabled:opacity-50 transition-colors">
                           Approve
                         </button>
-                        <button
-                          onClick={() => setShowModal({ type: 'reject', approval })}
+                        <button onClick={() => setShowModal({ type: 'reject', approval })}
                           disabled={actionLoading === approval.id}
-                          className="px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50 text-xs"
-                        >
+                          className="px-2.5 py-1.5 border border-red-200 text-red-600 hover:bg-red-50 text-xs font-medium rounded-lg disabled:opacity-50 transition-colors">
                           Reject
                         </button>
                       </div>
@@ -275,82 +220,47 @@ function Approvals() {
             </table>
           </div>
         ) : (
-          <div className="text-center py-12 text-gray-400">
-            <CheckCircle className="w-16 h-16 mx-auto mb-4" />
-            <p>No pending approvals</p>
+          <div className="text-center py-16">
+            <CheckCircle className="w-10 h-10 mx-auto text-slate-200 mb-3" />
+            <p className="text-sm text-slate-400">No pending approvals</p>
           </div>
         )}
       </div>
 
-      {/* Approval/Reject Modal */}
+      {/* Modal */}
       {showModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl p-6 w-full max-w-md">
-            <h3 className="text-lg font-semibold mb-4">
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50">
+          <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-xl p-6 w-full max-w-md mx-4">
+            <h3 className="text-base font-bold text-slate-800 dark:text-slate-100 mb-1">
               {showModal.type === 'approve' ? 'Approve Invoice' : 'Reject Invoice'}
             </h3>
-            <div className="mb-4">
-              <p className="text-sm text-gray-600">
-                Invoice: <strong>{showModal.approval.invoice_id}</strong><br />
-                Amount: <strong>${showModal.approval.total_amount?.toLocaleString()}</strong>
-              </p>
+            <p className="text-sm text-slate-500 dark:text-slate-400 mb-5">
+              {showModal.approval.invoice_id} &middot; <span className="font-medium text-slate-700">${showModal.approval.total_amount?.toLocaleString()}</span>
+            </p>
+
+            <div className="mb-5">
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">
+                {showModal.type === 'approve' ? 'Comments (optional)' : 'Rejection Reason *'}
+              </label>
+              <textarea
+                value={showModal.type === 'approve' ? comments : rejectReason}
+                onChange={(e) => showModal.type === 'approve' ? setComments(e.target.value) : setRejectReason(e.target.value)}
+                className="w-full px-3 py-2 text-sm border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
+                rows={3}
+                placeholder={showModal.type === 'approve' ? 'Add any comments...' : 'Enter reason for rejection...'}
+              />
             </div>
-            
-            {showModal.type === 'approve' ? (
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Comments (optional)
-                </label>
-                <textarea
-                  value={comments}
-                  onChange={(e) => setComments(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                  rows={3}
-                  placeholder="Add any comments..."
-                />
-              </div>
-            ) : (
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Rejection Reason *
-                </label>
-                <textarea
-                  value={rejectReason}
-                  onChange={(e) => setRejectReason(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                  rows={3}
-                  placeholder="Enter reason for rejection..."
-                  required
-                />
-              </div>
-            )}
-            
+
             <div className="flex gap-3">
-              <button
-                onClick={() => {
-                  setShowModal(null);
-                  setComments('');
-                  setRejectReason('');
-                }}
-                className="flex-1 px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300"
-              >
+              <button onClick={() => { setShowModal(null); setComments(''); setRejectReason(''); }}
+                className="flex-1 px-4 py-2.5 text-sm font-medium border border-slate-200 text-slate-600 rounded-lg hover:bg-slate-50 transition-colors">
                 Cancel
               </button>
               <button
-                onClick={() => {
-                  if (showModal.type === 'approve') {
-                    handleApprove(showModal.approval.id);
-                  } else {
-                    handleReject(showModal.approval.id);
-                  }
-                }}
-                disabled={actionLoading}
-                className={`flex-1 px-4 py-2 text-white rounded-lg ${
-                  showModal.type === 'approve' 
-                    ? 'bg-green-600 hover:bg-green-700' 
-                    : 'bg-red-600 hover:bg-red-700'
-                } disabled:opacity-50`}
-              >
+                onClick={() => showModal.type === 'approve' ? handleApprove(showModal.approval.id) : handleReject(showModal.approval.id)}
+                disabled={!!actionLoading}
+                className={`flex-1 px-4 py-2.5 text-sm font-semibold text-white rounded-lg disabled:opacity-50 transition-colors ${
+                  showModal.type === 'approve' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-red-600 hover:bg-red-700'}`}>
                 {actionLoading ? 'Processing...' : showModal.type === 'approve' ? 'Approve' : 'Reject'}
               </button>
             </div>

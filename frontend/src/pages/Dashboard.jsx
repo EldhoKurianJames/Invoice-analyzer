@@ -1,5 +1,3 @@
-// Main dashboard page - placeholder
-
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { 
@@ -10,28 +8,31 @@ import {
   CheckCircle,
   Clock,
   TrendingUp,
-  Users
+  ArrowUpRight
 } from 'lucide-react';
 import { getAnalyticsSummary, getApprovalsDashboard } from '../services/api';
 
-function StatCard({ title, value, icon: Icon, color, link }) {
+function StatCard({ title, value, icon: Icon, link, sub }) {
   const content = (
-    <div className={`bg-white rounded-xl shadow-sm p-6 border-l-4 ${color}`}>
-      <div className="flex items-center justify-between">
+    <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-6 hover:shadow-md transition-shadow group">
+      <div className="flex items-start justify-between">
         <div>
-          <p className="text-sm font-medium text-gray-500">{title}</p>
-          <p className="text-3xl font-bold text-gray-900 mt-1">{value}</p>
+          <p className="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider">{title}</p>
+          <p className="text-2xl font-bold text-slate-800 dark:text-slate-100 mt-2">{value}</p>
+          {sub && <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">{sub}</p>}
         </div>
-        <div className={`p-3 rounded-full bg-opacity-10 ${color.replace('border-', 'bg-')}`}>
-          <Icon className={`w-6 h-6 ${color.replace('border-', 'text-')}`} />
+        <div className="p-2 bg-slate-50 rounded-lg group-hover:bg-indigo-50 transition-colors">
+          <Icon className="w-5 h-5 text-slate-400 group-hover:text-indigo-500 transition-colors" />
         </div>
       </div>
+      {link && (
+        <div className="mt-4 flex items-center gap-1 text-xs text-indigo-600 font-medium">
+          View details <ArrowUpRight className="w-3 h-3" />
+        </div>
+      )}
     </div>
   );
-  
-  if (link) {
-    return <Link to={link}>{content}</Link>;
-  }
+  if (link) return <Link to={link}>{content}</Link>;
   return content;
 }
 
@@ -64,20 +65,18 @@ function Dashboard() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+        <div className="animate-spin rounded-full h-8 w-8 border-2 border-slate-200 border-t-indigo-600"></div>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="bg-red-50 border border-red-200 rounded-lg p-6">
-        <div className="flex items-center gap-3">
-          <AlertTriangle className="w-6 h-6 text-red-500" />
-          <div>
-            <h3 className="font-semibold text-red-800">Connection Error</h3>
-            <p className="text-red-600">{error}</p>
-          </div>
+      <div className="bg-white border border-red-200 rounded-xl p-5 flex items-start gap-3">
+        <AlertTriangle className="w-5 h-5 text-red-500 mt-0.5 flex-shrink-0" />
+        <div>
+          <p className="text-sm font-semibold text-slate-800">Connection Error</p>
+          <p className="text-sm text-slate-500 mt-0.5">{error}</p>
         </div>
       </div>
     );
@@ -85,103 +84,53 @@ function Dashboard() {
 
   return (
     <div>
+      {/* Page Header */}
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900">Dashboard</h1>
-        <p className="text-gray-500 mt-1">Overview of your invoice processing system</p>
+        <h1 className="text-xl font-bold text-slate-800 dark:text-slate-100">Dashboard</h1>
+        <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">Overview of your invoice processing system</p>
       </div>
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        <StatCard
-          title="Total Invoices"
-          value={summary?.total_invoices || 0}
-          icon={FileText}
-          color="border-blue-500"
-          link="/analytics"
-        />
-        <StatCard
-          title="Amount Processed"
-          value={`$${(summary?.total_amount_processed || 0).toLocaleString()}`}
-          icon={DollarSign}
-          color="border-green-500"
-          link="/analytics"
-        />
-        <StatCard
-          title="Pending Approvals"
-          value={approvals?.summary?.total_pending || 0}
-          icon={Clock}
-          color="border-yellow-500"
-          link="/approvals"
-        />
-        <StatCard
-          title="High Risk Invoices"
-          value={summary?.high_risk_invoices || 0}
-          icon={AlertTriangle}
-          color="border-red-500"
-          link="/vendors"
-        />
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        <StatCard title="Total Invoices" value={summary?.total_invoices || 0} icon={FileText} link="/analytics" sub="All time" />
+        <StatCard title="Amount Processed" value={`$${(summary?.total_amount_processed || 0).toLocaleString()}`} icon={DollarSign} link="/analytics" sub="Total value" />
+        <StatCard title="Pending Approvals" value={approvals?.summary?.total_pending || 0} icon={Clock} link="/approvals" sub="Awaiting review" />
+        <StatCard title="High Risk Invoices" value={summary?.high_risk_invoices || 0} icon={AlertTriangle} link="/vendors" sub="Score ≥ 70" />
       </div>
 
       {/* Quick Actions */}
-      <div className="bg-white rounded-xl shadow-sm p-6 mb-8">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">Quick Actions</h2>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <Link
-            to="/upload"
-            className="flex flex-col items-center p-4 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors"
-          >
-            <Upload className="w-8 h-8 text-blue-600 mb-2" />
-            <span className="text-sm font-medium text-blue-900">Upload Invoice</span>
-          </Link>
-          <Link
-            to="/approvals"
-            className="flex flex-col items-center p-4 bg-yellow-50 rounded-lg hover:bg-yellow-100 transition-colors"
-          >
-            <CheckCircle className="w-8 h-8 text-yellow-600 mb-2" />
-            <span className="text-sm font-medium text-yellow-900">Review Approvals</span>
-          </Link>
-          <Link
-            to="/analytics"
-            className="flex flex-col items-center p-4 bg-green-50 rounded-lg hover:bg-green-100 transition-colors"
-          >
-            <TrendingUp className="w-8 h-8 text-green-600 mb-2" />
-            <span className="text-sm font-medium text-green-900">View Analytics</span>
-          </Link>
-          <Link
-            to="/signed"
-            className="flex flex-col items-center p-4 bg-purple-50 rounded-lg hover:bg-purple-100 transition-colors"
-          >
-            <FileText className="w-8 h-8 text-purple-600 mb-2" />
-            <span className="text-sm font-medium text-purple-900">Download Signed</span>
-          </Link>
+      <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-6 mb-6">
+        <h2 className="text-sm font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-4">Quick Actions</h2>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          {[
+            { to: '/upload', icon: Upload, label: 'Upload Invoice' },
+            { to: '/approvals', icon: CheckCircle, label: 'Review Approvals' },
+            { to: '/analytics', icon: TrendingUp, label: 'View Analytics' },
+            { to: '/signed', icon: FileText, label: 'Download Signed' },
+          ].map(({ to, icon: Icon, label }) => (
+            <Link key={to} to={to}
+              className="flex items-center gap-3 px-4 py-3 rounded-lg border border-slate-200 dark:border-slate-700 hover:border-indigo-300 dark:hover:border-indigo-500 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 transition-all group"
+            >
+              <Icon className="w-4 h-4 text-slate-400 group-hover:text-indigo-500 transition-colors" />
+              <span className="text-sm font-medium text-slate-600 dark:text-slate-300 group-hover:text-indigo-600 dark:group-hover:text-indigo-400">{label}</span>
+            </Link>
+          ))}
         </div>
       </div>
 
-      {/* Additional Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="bg-white rounded-xl shadow-sm p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Tax Collected</h3>
-          <p className="text-3xl font-bold text-green-600">
-            ${(summary?.total_tax_collected || 0).toLocaleString()}
-          </p>
-          <p className="text-sm text-gray-500 mt-1">Total tax from all invoices</p>
-        </div>
-        
-        <div className="bg-white rounded-xl shadow-sm p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">This Month</h3>
-          <p className="text-3xl font-bold text-blue-600">
-            {summary?.invoices_this_month || 0}
-          </p>
-          <p className="text-sm text-gray-500 mt-1">Invoices processed this month</p>
-        </div>
-        
-        <div className="bg-white rounded-xl shadow-sm p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Vendors Tracked</h3>
-          <p className="text-3xl font-bold text-purple-600">
-            {summary?.unique_vendors || 0}
-          </p>
-          <p className="text-sm text-gray-500 mt-1">Unique vendors in system</p>
-        </div>
+      {/* Secondary Stats */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {[
+          { label: 'Tax Collected', value: `$${(summary?.total_tax_collected || 0).toLocaleString()}`, sub: 'Total from all invoices' },
+          { label: 'This Month', value: summary?.invoices_this_month || 0, sub: 'Invoices processed' },
+          { label: 'Vendors Tracked', value: summary?.unique_vendors || 0, sub: 'Unique vendors in system' },
+        ].map(({ label, value, sub }) => (
+          <div key={label} className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-6">
+            <p className="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider">{label}</p>
+            <p className="text-2xl font-bold text-slate-800 dark:text-slate-100 mt-2">{value}</p>
+            <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">{sub}</p>
+          </div>
+        ))}
       </div>
     </div>
   );

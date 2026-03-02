@@ -120,8 +120,10 @@ async def upload_invoice(
                 else:
                     cert_text = extract_text_from_image(cert_temp_path)
                 
+                print(f"DEBUG CERT OCR TEXT:\n{cert_text}\n")
                 # Parse quality certificate
                 parsed_certificate = parse_quality_certificate(cert_text)
+                print(f"DEBUG CERT PARSED: exporter='{parsed_certificate.exporter_name}' hs_codes={parsed_certificate.hs_codes} signature={parsed_certificate.has_signature}")
                 
                 # Get restricted items from invoice for validation
                 from app.validation.country_rules import COUNTRY_RULES
@@ -135,12 +137,18 @@ async def upload_invoice(
                     restricted_items = []
                     print(f"DEBUG MAIN: Checking {len(invoice_data.line_items)} invoice items...")
                     
+                    from app.validation.country_rules import classify_product_category
                     for item in invoice_data.line_items:
                         item_desc_lower = item.description.lower()
-                        print(f"DEBUG MAIN: Checking item: '{item.description}' (lowercase: '{item_desc_lower}')")
+                        item_hs = getattr(item, 'hs_code', None)
+                        detected_cat = classify_product_category(hs_code=item_hs, description=item.description)
+                        print(f"DEBUG MAIN: Checking item: '{item.description}' detected_category='{detected_cat}'")
                         
                         for restricted_name in restricted_item_names:
-                            if restricted_name in item_desc_lower:
+                            if (
+                                restricted_name in item_desc_lower
+                                or (detected_cat and restricted_name in detected_cat)
+                            ):
                                 print(f"DEBUG MAIN: FOUND restricted item: '{item.description}' matches '{restricted_name}'")
                                 restricted_items.append(item)
                                 break
@@ -171,6 +179,32 @@ async def upload_invoice(
             validation_errors = validate_invoice(invoice_data, country)
         except Exception as e:
             return {"filename": file.filename, "status": "error", "message": f"Validation failed: {str(e)}"}
+
+        # If certificate was uploaded and all restricted items were cleared,
+        # suppress RESTRICTED ITEM errors from validate_country_rules for those items.
+        if quality_certificate and certificate_validation_errors == []:
+            from app.validation.country_rules import classify_product_category, COUNTRY_RULES
+            _country_lower = country.lower()
+            _cleared_descs = set()
+            if _country_lower in COUNTRY_RULES:
+                _restricted_names = COUNTRY_RULES[_country_lower]["restricted_items"]
+                for _item in invoice_data.line_items:
+                    _cat = classify_product_category(
+                        hs_code=getattr(_item, 'hs_code', None),
+                        description=_item.description
+                    )
+                    for _rname in _restricted_names:
+                        if _rname in _item.description.lower() or (_cat and _rname in _cat):
+                            _cleared_descs.add(_item.description.lower())
+                            break
+            validation_errors = [
+                e for e in validation_errors
+                if not (
+                    e.startswith("RESTRICTED ITEM:")
+                    and any(desc in e.lower() for desc in _cleared_descs)
+                )
+            ]
+            print(f"DEBUG MAIN: After cert clearing, validation_errors={validation_errors}")
 
         # Validate product-specific tax rates for the destination country
         product_tax_errors = []
