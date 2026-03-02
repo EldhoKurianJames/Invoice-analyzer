@@ -22,6 +22,7 @@ def parse_invoice(text: str) -> Dict[str, Any]:
     tax_pattern = re.compile(r'Tax\s+Amount\s*(?:\([^)]*\))?\s*:\s*\$?([\d,]+\.?\d*)', re.IGNORECASE)
     tax_percentage_pattern = re.compile(r'Tax\s+Percentage\s*:\s*(\d+(?:\.\d+)?)%', re.IGNORECASE)
     customer_pattern = re.compile(r'(?:Bill\s+to|Customer|Importer)[:.]?\s*([^\n\r]+)', re.IGNORECASE)
+    exporter_pattern = re.compile(r'(?:Exporter|Vendor|Seller|Shipper|Ship\s+from|From)[:.]?\s*([^\n\r]+)', re.IGNORECASE)
 
     # Search for patterns
     invoice_id = invoice_id_pattern.search(text)
@@ -32,6 +33,7 @@ def parse_invoice(text: str) -> Dict[str, Any]:
     tax_amount = tax_pattern.search(text)
     tax_percentage = tax_percentage_pattern.search(text)
     customer_name = customer_pattern.search(text)
+    exporter_name = exporter_pattern.search(text)
 
     # Extract line items from invoice text with HS codes, tax percentage, subtotal, and total
     line_items = []
@@ -186,6 +188,7 @@ def parse_invoice(text: str) -> Dict[str, Any]:
         'invoice_date': invoice_date.group(1) if invoice_date else None,
         'due_date': due_date.group(1) if due_date else None,
         'customer_name': customer_name.group(1).strip() if customer_name else None,
+        'exporter_name': exporter_name.group(1).strip() if exporter_name else None,
         'total_amount': float(total_amount.group(1).replace(',', '')) if total_amount else None,
         'subtotal': float(subtotal.group(1).replace(',', '')) if subtotal else None,
         'tax_amount': float(tax_amount.group(1).replace(',', '')) if tax_amount else None,

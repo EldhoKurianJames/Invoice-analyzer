@@ -193,56 +193,87 @@ def get_vendor_risk_score(db: Session, vendor_name: str) -> Tuple[float, Dict]:
             "recommendation": "First invoice from this vendor, apply standard scrutiny"
         }
     
+    # Use the stored score (computed by update_vendor_score with weighted errors)
+    risk_score = vendor.risk_score
+
+    # Build details
+    if vendor.total_invoices > 0:
+        success_rate = vendor.successful_invoices / vendor.total_invoices
+        success_rate_str = f"{success_rate * 100:.1f}%"
+    else:
+        success_rate_str = "N/A"
+
+    try:
+        stored = json.loads(vendor.notes) if vendor.notes else {}
+    except Exception:
+        stored = {}
+
+    cumulative_penalty = stored.get("cumulative_penalty", 0.0)
+
     details = {
         "total_invoices": vendor.total_invoices,
         "successful_invoices": vendor.successful_invoices,
         "failed_invoices": vendor.failed_invoices,
+        "success_rate": success_rate_str,
         "total_amount_processed": vendor.total_amount_processed,
-        "last_invoice_date": vendor.last_invoice_date.isoformat() if vendor.last_invoice_date else None
+        "last_invoice_date": vendor.last_invoice_date.isoformat() if vendor.last_invoice_date else None,
+        "cumulative_error_penalty": round(cumulative_penalty, 2),
+        "avg_error_penalty_per_failure": round(cumulative_penalty / vendor.failed_invoices, 2) if vendor.failed_invoices > 0 else 0.0,
+        "calculated_risk_score": round(risk_score, 2),
+        "scoring_notes": (
+            "Low history — score less reliable" if vendor.total_invoices < 5
+            else "Established vendor" if vendor.total_invoices >= 20
+            else "Normal history"
+        )
     }
-    
-    # Calculate success rate
-    if vendor.total_invoices > 0:
-        success_rate = vendor.successful_invoices / vendor.total_invoices
-        details["success_rate"] = f"{success_rate * 100:.1f}%"
-    else:
-        success_rate = 0.5
-    
-    # Base risk from success rate (inverted - higher success = lower risk)
-    risk_score = (1 - success_rate) * 60  # Max 60 points from failure rate
-    
-    # Adjust for volume (more history = more confident in score)
-    if vendor.total_invoices < 5:
-        risk_score += 15  # Low history penalty
-        details["volume_note"] = "Limited history - score less reliable"
-    elif vendor.total_invoices > 20:
-        risk_score -= 5  # High volume bonus
-        details["volume_note"] = "Established vendor with good history"
-    
-    # Adjust for recency
-    if vendor.last_invoice_date:
-        days_since_last = (datetime.utcnow() - vendor.last_invoice_date).days
-        if days_since_last > 180:
-            risk_score += 10
-            details["recency_note"] = f"No invoices in {days_since_last} days"
-    
-    risk_score = max(0, min(100, risk_score))
-    details["calculated_risk_score"] = round(risk_score, 2)
-    
+
     return risk_score, details
 
 
-def update_vendor_score(db: Session, vendor_name: str, invoice_passed: bool, amount: float):
+# Error severity weights — higher = more serious infraction
+_ERROR_WEIGHTS = [
+    # (substring to match in error message, penalty points)
+    ("TAX RATE ERROR",        10.0),  # Wrong tax % — high severity
+    ("TAX CALCULATION",       8.0),   # Tax amount doesn't match %
+    ("TAX ERROR",             7.0),   # General tax error
+    ("TAX INFO MISSING",      5.0),   # Tax info not found for product
+    ("GRAND TOTAL",           6.0),   # Grand total mismatch
+    ("SUBTOTAL ERROR",        4.0),   # Subtotal mismatch
+    ("FRAUD ALERT",          12.0),   # Fraud flag raised
+    ("MISSING FIELDS",        5.0),   # Required fields absent
+    ("DUPLICATE",            10.0),   # Duplicate invoice
+]
+_DEFAULT_ERROR_PENALTY = 3.0  # Generic/unknown error
+
+
+def _calculate_error_penalty(errors: List[str]) -> float:
+    """Sum weighted penalties for a list of validation error strings."""
+    total = 0.0
+    for err in errors:
+        err_upper = err.upper()
+        matched = False
+        for keyword, weight in _ERROR_WEIGHTS:
+            if keyword in err_upper:
+                total += weight
+                matched = True
+                break
+        if not matched:
+            total += _DEFAULT_ERROR_PENALTY
+    return total
+
+
+def update_vendor_score(db: Session, vendor_name: str, invoice_passed: bool, amount: float, errors: List[str] = None):
     """
     Update vendor score after processing an invoice.
+    Errors list is used to weight the penalty by error severity.
     """
     if not vendor_name:
         return
-    
+
     vendor = db.query(models.VendorScore).filter(
         models.VendorScore.vendor_name == vendor_name
     ).first()
-    
+
     if not vendor:
         vendor = models.VendorScore(
             vendor_name=vendor_name,
@@ -253,7 +284,7 @@ def update_vendor_score(db: Session, vendor_name: str, invoice_passed: bool, amo
             risk_score=50.0
         )
         db.add(vendor)
-    
+
     vendor.total_invoices += 1
     if invoice_passed:
         vendor.successful_invoices += 1
@@ -261,12 +292,46 @@ def update_vendor_score(db: Session, vendor_name: str, invoice_passed: bool, amo
         vendor.failed_invoices += 1
     vendor.total_amount_processed += amount or 0
     vendor.last_invoice_date = datetime.utcnow()
-    
-    # Recalculate risk score
+
+    # --- Weighted risk score recalculation ---
+    # Base: failure rate contributes up to 50 points
     if vendor.total_invoices > 0:
-        success_rate = vendor.successful_invoices / vendor.total_invoices
-        vendor.risk_score = max(0, min(100, (1 - success_rate) * 70))
-    
+        failure_rate = vendor.failed_invoices / vendor.total_invoices
+        base_score = failure_rate * 50.0
+    else:
+        base_score = 25.0
+
+    # Error penalty: weighted by error type, averaged across failed invoices
+    # We store cumulative penalty in notes field as JSON
+    try:
+        stored = json.loads(vendor.notes) if vendor.notes else {}
+    except Exception:
+        stored = {}
+
+    cumulative_penalty = stored.get("cumulative_penalty", 0.0)
+    if not invoice_passed and errors:
+        cumulative_penalty += _calculate_error_penalty(errors)
+    stored["cumulative_penalty"] = cumulative_penalty
+    vendor.notes = json.dumps(stored)
+
+    # Average penalty per failed invoice (max 40 points contribution)
+    if vendor.failed_invoices > 0:
+        avg_penalty = cumulative_penalty / vendor.failed_invoices
+        # Normalise: 30 penalty points = full 40-point contribution
+        penalty_score = min(40.0, (avg_penalty / 30.0) * 40.0)
+    else:
+        penalty_score = 0.0
+
+    # Volume bonus: established vendors with many invoices get slight relief
+    if vendor.total_invoices >= 20:
+        volume_adj = -5.0
+    elif vendor.total_invoices < 5:
+        volume_adj = 10.0  # Low history — less certainty
+    else:
+        volume_adj = 0.0
+
+    vendor.risk_score = max(0.0, min(100.0, base_score + penalty_score + volume_adj))
+
     db.commit()
 
 

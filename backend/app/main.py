@@ -219,8 +219,8 @@ async def upload_invoice(
         fraud_result = None
         vendor_name = None
         try:
-            # Extract vendor name from invoice text or customer field
-            vendor_name = invoice_data.customer_name  # Could be exporter name
+            # Use exporter_name if available, fall back to customer_name
+            vendor_name = invoice_data.exporter_name or invoice_data.customer_name
             
             fraud_result = run_fraud_detection(db, invoice_data, vendor_name, country)
             print(f"DEBUG MAIN: Fraud detection score: {fraud_result.fraud_score}")
@@ -240,10 +240,10 @@ async def upload_invoice(
         fraud_analysis = fraud_result.to_dict() if fraud_result else None
         
         if all_errors:
-            # Update vendor score (failed)
+            # Update vendor score (failed) — pass errors for weighted penalty
             if vendor_name:
                 try:
-                    update_vendor_score(db, vendor_name, invoice_passed=False, amount=invoice_data.total_amount or 0)
+                    update_vendor_score(db, vendor_name, invoice_passed=False, amount=invoice_data.total_amount or 0, errors=all_errors)
                 except:
                     pass
             
@@ -394,8 +394,8 @@ async def export_invoices_to_excel(db: Session = Depends(get_db)):
     
     # Add headers for summary sheet
     summary_headers = [
-        "ID", "Invoice ID", "Invoice Date", "Due Date", 
-        "Vendor/Exporter", "Customer/Importer", "Country",
+        "ID", "Invoice ID", "Invoice Date", "Due Date",
+        "Exporter (Vendor)", "Importer (Customer)", "Country",
         "Subtotal", "Tax Amount", "Tax %", "Total Amount",
         "Fraud Score", "Risk Level", "Created At"
     ]
@@ -426,8 +426,8 @@ async def export_invoices_to_excel(db: Session = Depends(get_db)):
             inv.invoice_id,
             str(inv.invoice_date) if inv.invoice_date else "",
             str(inv.due_date) if inv.due_date else "",
-            inv.vendor_name or "",
-            inv.customer_name or "",
+            inv.vendor_name or "",   # Exporter — stored in vendor_name column
+            inv.customer_name or "", # Importer — stored in customer_name column
             inv.country or "",
             export_subtotal or 0,
             export_tax_amount or 0,
