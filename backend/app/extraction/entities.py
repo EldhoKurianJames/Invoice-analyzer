@@ -19,6 +19,8 @@ class InvoiceData(BaseModel):
     due_date: Optional[date] = None
     customer_name: Optional[str] = None  # Importer / Bill-to party
     exporter_name: Optional[str] = None  # Exporter / Vendor / Seller
+    exporter_country: Optional[str] = None  # Country of exporter
+    importer_country: Optional[str] = None  # Country of importer
     total_amount: Optional[float] = None
     subtotal: Optional[float] = None
     tax_amount: Optional[float] = None

@@ -233,15 +233,18 @@ def get_vendor_risk_score(db: Session, vendor_name: str) -> Tuple[float, Dict]:
 # Error severity weights — higher = more serious infraction
 _ERROR_WEIGHTS = [
     # (substring to match in error message, penalty points)
-    ("TAX RATE ERROR",        10.0),  # Wrong tax % — high severity
-    ("TAX CALCULATION",       8.0),   # Tax amount doesn't match %
-    ("TAX ERROR",             7.0),   # General tax error
-    ("TAX INFO MISSING",      5.0),   # Tax info not found for product
-    ("GRAND TOTAL",           6.0),   # Grand total mismatch
-    ("SUBTOTAL ERROR",        4.0),   # Subtotal mismatch
-    ("FRAUD ALERT",          12.0),   # Fraud flag raised
-    ("MISSING FIELDS",        5.0),   # Required fields absent
-    ("DUPLICATE",            10.0),   # Duplicate invoice
+    ("FRAUD ALERT",          12.0),   # Fraud flag raised — CRITICAL
+    ("DUPLICATE",            11.0),   # Duplicate invoice — CRITICAL
+    ("TAX RATE ERROR",       10.0),   # Wrong tax % — HIGH severity
+    ("TAX CALCULATION",       9.0),   # Tax amount doesn't match % — HIGH
+    ("SUBTOTAL ERROR",        8.0),   # Subtotal mismatch — HIGH
+    ("GRAND TOTAL",           8.0),   # Grand total mismatch — HIGH
+    ("TAX ERROR",             7.0),   # General tax error — MEDIUM-HIGH
+    ("TAX INFO MISSING",      5.0),   # Tax info not found for product — MEDIUM
+    ("MISSING FIELDS",        4.0),   # Required fields absent — MEDIUM
+    ("CERTIFICATE MISSING",   2.0),   # Certificate not uploaded — LOW (admin error, not fraud)
+    ("INVALID CERTIFICATE",   3.0),   # Certificate invalid/unsigned — LOW-MEDIUM
+    ("RESTRICTED ITEM",       2.5),   # Restricted item without cert — LOW (same as certificate)
 ]
 _DEFAULT_ERROR_PENALTY = 3.0  # Generic/unknown error
 
@@ -392,10 +395,14 @@ def run_fraud_detection(db: Session, invoice: InvoiceData, vendor_name: str = No
     vendor_risk, vendor_details = get_vendor_risk_score(db, vendor_name)
     result.details["vendor_analysis"] = vendor_details
     
+    # Vendor risk is informational context, not a fraud flag for THIS invoice
+    # Store it separately so UI can display it distinctly
     if vendor_risk >= 70:
-        result.add_flag(f"HIGH RISK VENDOR: '{vendor_name}' has risk score {vendor_risk:.1f}", 25)
+        result.add_warning(f"VENDOR HISTORY: '{vendor_name}' has HIGH risk score {vendor_risk:.1f} based on past invoices")
     elif vendor_risk >= 50:
-        result.add_warning(f"Vendor '{vendor_name}' has moderate risk score: {vendor_risk:.1f}")
+        result.add_warning(f"VENDOR HISTORY: '{vendor_name}' has MODERATE risk score {vendor_risk:.1f} based on past invoices")
+    else:
+        result.add_warning(f"VENDOR HISTORY: '{vendor_name}' has LOW risk score {vendor_risk:.1f} based on past invoices")
     
     # 4. Additional checks
     # Check for round number amounts (potential fabrication)

@@ -18,7 +18,9 @@ class Invoice(Base):
     tax_percentage = Column(Float, nullable=True)
     # New fields for fraud detection
     vendor_name = Column(String, nullable=True)  # Exporter name
-    country = Column(String, nullable=True)  # Destination country
+    country = Column(String, nullable=True)  # Destination country (importer country)
+    exporter_country = Column(String, nullable=True)  # Country of exporter/vendor
+    importer_country = Column(String, nullable=True)  # Country of importer/customer
     created_at = Column(DateTime, default=datetime.utcnow)
     fraud_score = Column(Float, default=0.0)  # 0-100 risk score
     fraud_flags = Column(Text, nullable=True)  # JSON string of detected issues

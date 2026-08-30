@@ -9,8 +9,8 @@ from pdf2image import convert_from_path
 from openpyxl import Workbook
 from pathlib import Path
 
-from app.ocr.text_ocr import extract_text_from_image
-from app.extraction.invoice_parser import parse_invoice
+from app.ocr.text_ocr import extract_text_from_image, extract_text_from_pdf
+from app.extraction.template_parser import extract_invoice_data
 from app.extraction.entities import InvoiceData
 from app.extraction.certificate_parser import parse_quality_certificate, validate_restricted_items_against_certificate
 from app.validation.rule_engine import validate_invoice
@@ -79,13 +79,23 @@ async def upload_invoice(
 
         # Extract text from file
         try:
+            images = []
             if file.content_type == "application/pdf":
-                images = convert_from_path(temp_file_path)
-                extracted_text = extract_text_from_image(images[0]) if images else ""
+                extracted_text = extract_text_from_pdf(temp_file_path)
+                if not extracted_text:
+                    images = convert_from_path(temp_file_path)
+                    extracted_text = extract_text_from_image(images[0]) if images else ""
             else:
                 extracted_text = extract_text_from_image(temp_file_path)
         except Exception as e:
             return {"filename": file.filename, "status": "error", "message": f"OCR processing failed: {str(e)}"}
+
+        if not extracted_text.strip():
+            return {
+                "filename": file.filename,
+                "status": "error",
+                "message": "No text could be extracted from the invoice.",
+            }
 
         # Parse extracted text
         try:
@@ -94,7 +104,7 @@ async def upload_invoice(
             print(extracted_text)
             print(f"=== END OCR TEXT ===")
             
-            parsed_data_dict = parse_invoice(extracted_text)
+            parsed_data_dict = extract_invoice_data(extracted_text, image=images[0] if images else None, pdf_path=temp_file_path)
             invoice_data = InvoiceData(**parsed_data_dict)
             
             print(f"DEBUG MAIN: Parsed invoice data:")
@@ -223,7 +233,7 @@ async def upload_invoice(
             vendor_name = invoice_data.exporter_name or invoice_data.customer_name
             
             fraud_result = run_fraud_detection(db, invoice_data, vendor_name, country)
-            print(f"DEBUG MAIN: Fraud detection score: {fraud_result.fraud_score}")
+            print(f"DEBUG MAIN: Initial fraud detection score: {fraud_result.fraud_score}")
             print(f"DEBUG MAIN: Fraud flags: {fraud_result.flags}")
             
             # Add fraud flags as errors if high risk
@@ -236,33 +246,36 @@ async def upload_invoice(
         # Combine all validation errors
         all_errors = validation_errors + certificate_validation_errors + product_tax_errors
         
+        # Increase fraud score based on validation errors
+        # Each error adds to the fraud score to reflect invoice quality
+        if fraud_result and len(all_errors) > 0:
+            # Critical errors (subtotal, total, tax calculation): +10 points each
+            # Other errors: +5 points each
+            for error in all_errors:
+                if any(keyword in error.upper() for keyword in ["SUBTOTAL ERROR", "TOTAL ERROR", "GRAND TOTAL ERROR"]):
+                    fraud_result.add_flag(error, 10)
+                elif any(keyword in error.upper() for keyword in ["TAX", "CERTIFICATE", "DUPLICATE"]):
+                    fraud_result.add_flag(error, 8)
+                else:
+                    fraud_result.add_flag(error, 5)
+            
+            print(f"DEBUG MAIN: Adjusted fraud score after validation errors: {fraud_result.fraud_score}")
+            print(f"DEBUG MAIN: Total errors considered: {len(all_errors)}")
+        
         # Prepare response with fraud analysis
         fraud_analysis = fraud_result.to_dict() if fraud_result else None
         
-        if all_errors:
-            # Update vendor score (failed) — pass errors for weighted penalty
-            if vendor_name:
-                try:
-                    update_vendor_score(db, vendor_name, invoice_passed=False, amount=invoice_data.total_amount or 0, errors=all_errors)
-                except:
-                    pass
-            
-            return {
-                "filename": file.filename, 
-                "status": "validation_failed", 
-                "errors": all_errors,
-                "fraud_analysis": fraud_analysis
-            }
+        # Update vendor score based on validation result
+        has_errors = len(all_errors) > 0
+        if vendor_name:
+            try:
+                update_vendor_score(db, vendor_name, invoice_passed=not has_errors, amount=invoice_data.total_amount or 0, errors=all_errors if has_errors else None)
+            except:
+                pass
         
-        # Process valid invoice (only save if tax validation passes)
+        # Save ALL invoices to database (even those with errors)
+        # Invoices with errors will be sent to approval workflow for manual review
         try:
-            # Update vendor score (passed)
-            if vendor_name:
-                try:
-                    update_vendor_score(db, vendor_name, invoice_passed=True, amount=invoice_data.total_amount or 0)
-                except:
-                    pass
-            
             # Record price history for future anomaly detection
             try:
                 record_price_history(db, invoice_data.line_items, vendor_name, country)
@@ -281,10 +294,14 @@ async def upload_invoice(
                     if not item.tax_amount and getattr(item, 'subtotal', None) and getattr(item, 'tax_percentage', None):
                         item.tax_amount = item.subtotal * item.tax_percentage / 100
                 
-                # Get fraud flags if available
-                fraud_flags = []
+                # Combine fraud flags and validation errors for storage
+                # This allows us to check acceptance status later in Excel export
+                all_flags = []
                 if fraud_result and getattr(fraud_result, "flags", None):
-                    fraud_flags = fraud_result.flags
+                    all_flags.extend(fraud_result.flags)
+                # Add validation errors to flags so we can track them
+                if has_errors:
+                    all_flags.extend(all_errors)
                 
                 saved_invoice = crud.create_invoice(
                     db=db, 
@@ -292,7 +309,7 @@ async def upload_invoice(
                     vendor_name=vendor_name,
                     country=country,
                     fraud_score=fraud_result.fraud_score if fraud_result else 0.0,
-                    fraud_flags=fraud_flags
+                    fraud_flags=all_flags
                 )
                 print(f"DEBUG MAIN: Successfully inserted invoice {saved_invoice.invoice_id} (ID: {saved_invoice.id}) with {len(invoice_data.line_items)} line items to database")
             except Exception as e:
@@ -300,57 +317,123 @@ async def upload_invoice(
                 db.rollback()
                 raise
             
-            # Create approval request for workflow
+            # Determine if invoice needs approval or can be auto-approved
             approval_info = None
-            try:
-                approval = create_approval_request(
-                    db=db,
-                    invoice_id=invoice_data.invoice_id or f"INV-{file.filename}",
-                    vendor_name=vendor_name,
-                    country=country,
-                    total_amount=invoice_data.total_amount,
-                    fraud_score=fraud_result.fraud_score if fraud_result else 0
-                )
-                print(f"DEBUG MAIN: Successfully created approval request (ID: {approval.id}, Status: {approval.status}, Level: {approval.level})")
+            fraud_score = fraud_result.fraud_score if fraud_result else 0
+            has_fraud_flags = fraud_result and fraud_result.flags and len(fraud_result.flags) > 0
+            
+            # Auto-reject if fraud score > 70
+            if fraud_score > 70:
+                print(f"DEBUG MAIN: Invoice AUTO-REJECTED due to very high fraud score ({fraud_score}).")
                 approval_info = {
-                    "approval_id": approval.id,
-                    "status": approval.status,
-                    "level": approval.level,
-                    "current_approver": approval.current_approver,
-                    "message": "Invoice submitted for approval"
+                    "status": "auto_rejected",
+                    "message": f"Invoice automatically rejected - fraud score too high ({fraud_score})"
                 }
-            except Exception as e:
-                print(f"ERROR: Failed to create approval: {e}")
-                db.rollback()
+            # Auto-approve ONLY if: no validation errors AND low fraud score AND no fraud flags
+            elif not has_errors and fraud_score < 30 and not has_fraud_flags:
+                print(f"DEBUG MAIN: Invoice passed all validations with low fraud score ({fraud_score}). AUTO-APPROVED.")
+                approval_info = {
+                    "status": "auto_approved",
+                    "message": "Invoice automatically approved - no errors detected"
+                }
+            else:
+                # Send to approval workflow for manual review if:
+                # - Has validation errors (subtotal wrong, tax errors, etc.)
+                # - Has fraud flags (duplicates, price anomalies)
+                # - Has elevated fraud score
+                reason = []
+                if has_errors:
+                    reason.append(f"{len(all_errors)} validation error(s)")
+                if has_fraud_flags:
+                    reason.append("fraud flags detected")
+                if fraud_score >= 30:
+                    reason.append(f"elevated fraud score ({fraud_score})")
+                
+                reason_text = ", ".join(reason)
+                
+                try:
+                    approval = create_approval_request(
+                        db=db,
+                        invoice_id=invoice_data.invoice_id or f"INV-{file.filename}",
+                        vendor_name=vendor_name,
+                        country=country,
+                        total_amount=invoice_data.total_amount,
+                        fraud_score=fraud_score
+                    )
+                    print(f"DEBUG MAIN: Invoice sent to approval workflow. Reason: {reason_text}")
+                    print(f"DEBUG MAIN: Successfully created approval request (ID: {approval.id}, Status: {approval.status}, Level: {approval.level})")
+                    approval_info = {
+                        "approval_id": approval.id,
+                        "status": approval.status,
+                        "level": approval.level,
+                        "current_approver": approval.current_approver,
+                        "message": f"Invoice submitted for manual approval: {reason_text}",
+                        "validation_errors": all_errors if has_errors else []
+                    }
+                except Exception as e:
+                    print(f"ERROR: Failed to create approval: {e}")
+                    db.rollback()
 
             if file.content_type == "application/pdf":
-                signed_pdf_path = os.path.join(SIGNED_INVOICES_DIR, f"signed_{file.filename}")
-                try:
-                    add_signature_to_pdf(temp_file_path, signed_pdf_path, SIGNATURE_PATH)
-                    signed_filename = f"signed_{file.filename}"
-                    print(f"DEBUG MAIN: Successfully processed and saved invoice {invoice_data.invoice_id}")
-                    print(f"  - Invoice ID: {invoice_data.invoice_id}")
-                    print(f"  - Customer: {invoice_data.customer_name}")
-                    print(f"  - Amount: ${invoice_data.total_amount}")
-                    print(f"  - Signed PDF: {signed_pdf_path}")
-                    print(f"  - Status: All data committed to database")
+                # Only sign PDFs if invoice has NO errors and low fraud score
+                # Invoices with errors should NOT get signed PDFs
+                if not has_errors and fraud_score < 30 and not has_fraud_flags:
+                    signed_pdf_path = os.path.join(SIGNED_INVOICES_DIR, f"signed_{file.filename}")
+                    try:
+                        add_signature_to_pdf(temp_file_path, signed_pdf_path, SIGNATURE_PATH)
+                        signed_filename = f"signed_{file.filename}"
+                        print(f"DEBUG MAIN: Successfully processed and saved invoice {invoice_data.invoice_id}")
+                        print(f"  - Invoice ID: {invoice_data.invoice_id}")
+                        print(f"  - Customer: {invoice_data.customer_name}")
+                        print(f"  - Amount: ${invoice_data.total_amount}")
+                        print(f"  - Signed PDF: {signed_pdf_path}")
+                        print(f"  - Status: All data committed to database")
+                        return {
+                            "filename": file.filename, 
+                            "status": "processed_and_saved", 
+                            "path": signed_pdf_path,
+                            "download_url": f"http://127.0.0.1:8001/invoices/signed/{signed_filename}",
+                            "signed_filename": signed_filename,
+                            "fraud_analysis": fraud_analysis,
+                            "approval": approval_info,
+                            "validation_errors": all_errors if has_errors else [],
+                            "database_status": "Data successfully committed"
+                        }
+                    except Exception as e:
+                        # If signing fails, still save to database but return without signing
+                        print(f"ERROR: PDF signing failed: {e}, but data was committed to database")
+                        return {
+                            "filename": file.filename, 
+                            "status": "processed_and_saved", 
+                            "message": f"Saved to database but signing failed: {str(e)}", 
+                            "fraud_analysis": fraud_analysis,
+                            "approval": approval_info,
+                            "validation_errors": all_errors if has_errors else [],
+                            "database_status": "Data successfully committed"
+                        }
+                else:
+                    # Invoice has errors - do NOT sign, just return saved status
+                    print(f"DEBUG MAIN: Invoice saved but NOT signed due to validation errors or high fraud score")
                     return {
                         "filename": file.filename, 
                         "status": "processed_and_saved", 
-                        "path": signed_pdf_path,
-                        "download_url": f"http://127.0.0.1:8001/invoices/signed/{signed_filename}",
-                        "signed_filename": signed_filename,
+                        "message": "Invoice saved to database but not signed due to validation errors",
                         "fraud_analysis": fraud_analysis,
                         "approval": approval_info,
+                        "validation_errors": all_errors if has_errors else [],
                         "database_status": "Data successfully committed"
                     }
-                except Exception as e:
-                    # If signing fails, still save to database but return without signing
-                    print(f"ERROR: PDF signing failed: {e}, but data was committed to database")
-                    return {"filename": file.filename, "status": "processed_and_saved", "message": f"Saved to database but signing failed: {str(e)}", "approval": approval_info, "database_status": "Data successfully committed"}
             else:
                 print(f"DEBUG MAIN: Successfully processed and saved invoice {invoice_data.invoice_id}")
-                return {"filename": file.filename, "status": "processed_and_saved", "data": invoice_data.dict(), "approval": approval_info, "database_status": "Data successfully committed"}
+                return {
+                    "filename": file.filename, 
+                    "status": "processed_and_saved", 
+                    "data": invoice_data.dict(), 
+                    "fraud_analysis": fraud_analysis,
+                    "approval": approval_info, 
+                    "validation_errors": all_errors if has_errors else [],
+                    "database_status": "Data successfully committed"
+                }
                 
         except Exception as e:
             return {"filename": file.filename, "status": "error", "message": f"Database operation failed: {str(e)}"}
@@ -395,7 +478,7 @@ async def export_invoices_to_excel(db: Session = Depends(get_db)):
     # Add headers for summary sheet
     summary_headers = [
         "ID", "Invoice ID", "Invoice Date", "Due Date",
-        "Exporter (Vendor)", "Importer (Customer)", "Country",
+        "Exporter (Vendor)", "Exporter Country", "Importer (Customer)", "Importer Country",
         "Subtotal", "Tax Amount", "Tax %", "Total Amount",
         "Fraud Score", "Risk Level", "Created At"
     ]
@@ -427,8 +510,9 @@ async def export_invoices_to_excel(db: Session = Depends(get_db)):
             str(inv.invoice_date) if inv.invoice_date else "",
             str(inv.due_date) if inv.due_date else "",
             inv.vendor_name or "",   # Exporter — stored in vendor_name column
+            inv.exporter_country or "",  # Exporter Country
             inv.customer_name or "", # Importer — stored in customer_name column
-            inv.country or "",
+            inv.importer_country or inv.country or "",  # Importer Country
             export_subtotal or 0,
             export_tax_amount or 0,
             export_tax_pct or 0,
@@ -447,13 +531,32 @@ async def export_invoices_to_excel(db: Session = Depends(get_db)):
     item_headers = [
         "Invoice ID", "Item Description", "HS Code", "Category",
         "Quantity", "Unit Price", "Subtotal", 
-        "Tax %", "Tax Amount", "Total", "Country"
+        "Tax %", "Tax Amount", "Total", "Country", "Acceptance"
     ]
     ws_items.append(item_headers)
     
     # Add line items for all invoices
     for inv in invoices:
         line_items = crud.get_invoice_line_items(db, inv.invoice_id)
+        
+        # Calculate acceptance status dynamically
+        # fraud_flags now contains BOTH fraud alerts AND validation errors
+        all_flags = []
+        try:
+            if inv.fraud_flags:
+                all_flags = json.loads(inv.fraud_flags)
+        except:
+            pass
+        
+        # Accept ONLY if: no errors at all AND low fraud score
+        # Reject if: fraud score > 70 OR has any errors
+        if len(all_flags) > 0 or inv.fraud_score > 70:
+            acceptance = "No"  # Has errors or auto-rejected
+        elif inv.fraud_score < 30:
+            acceptance = "Yes"  # Clean invoice, auto-accepted
+        else:
+            acceptance = "No"  # Medium fraud score, pending approval
+        
         for item in line_items:
             ws_items.append([
                 item.invoice_id,
@@ -466,7 +569,8 @@ async def export_invoices_to_excel(db: Session = Depends(get_db)):
                 item.tax_percentage or 0,
                 item.tax_amount or 0,
                 item.total or 0,
-                item.country or ""
+                item.country or "",
+                acceptance  # Yes if accepted, No if rejected or pending
             ])
     
     # Style line items header
@@ -545,6 +649,69 @@ async def download_signed_invoice(filename: str):
         filename=filename,
         media_type="application/pdf"
     )
+
+
+@app.get("/invoices/signed-all/download")
+async def download_all_signed_invoices():
+    """Download all signed invoices as a ZIP file."""
+    import zipfile
+    import tempfile
+    
+    signed_dir = Path(SIGNED_INVOICES_DIR)
+    if not signed_dir.exists():
+        return {"error": "No signed invoices directory found"}
+    
+    # Get all PDF files
+    pdf_files = list(signed_dir.glob("*.pdf"))
+    
+    if not pdf_files:
+        return {"error": "No signed invoices found"}
+    
+    # Create a temporary ZIP file
+    temp_zip = tempfile.NamedTemporaryFile(delete=False, suffix='.zip')
+    
+    try:
+        with zipfile.ZipFile(temp_zip.name, 'w', zipfile.ZIP_DEFLATED) as zipf:
+            for pdf_file in pdf_files:
+                zipf.write(pdf_file, arcname=pdf_file.name)
+        
+        return FileResponse(
+            path=temp_zip.name,
+            filename=f"signed_invoices_{datetime.now().strftime('%Y%m%d_%H%M%S')}.zip",
+            media_type="application/zip"
+        )
+    except Exception as e:
+        if os.path.exists(temp_zip.name):
+            os.remove(temp_zip.name)
+        return {"error": f"Failed to create ZIP file: {str(e)}"}
+
+
+@app.delete("/invoices/signed-all/delete")
+async def delete_all_signed_invoices():
+    """Delete all signed invoice PDFs."""
+    signed_dir = Path(SIGNED_INVOICES_DIR)
+    if not signed_dir.exists():
+        return {"message": "No signed invoices directory found", "deleted": 0}
+    
+    # Get all PDF files
+    pdf_files = list(signed_dir.glob("*.pdf"))
+    
+    if not pdf_files:
+        return {"message": "No signed invoices to delete", "deleted": 0}
+    
+    # Delete all PDF files
+    deleted_count = 0
+    for pdf_file in pdf_files:
+        try:
+            pdf_file.unlink()
+            deleted_count += 1
+        except Exception as e:
+            print(f"ERROR: Failed to delete {pdf_file.name}: {e}")
+    
+    return {
+        "message": f"Deleted {deleted_count} signed invoice(s)",
+        "deleted": deleted_count
+    }
 
 
 @app.get("/download-center", response_class=HTMLResponse)

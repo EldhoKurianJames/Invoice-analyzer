@@ -21,6 +21,8 @@ def create_invoice(db: Session, invoice: InvoiceData, vendor_name: str = None, c
         tax_percentage=invoice.tax_percentage,
         vendor_name=vendor_name,
         country=country,
+        exporter_country=invoice.exporter_country,
+        importer_country=invoice.importer_country or country,
         fraud_score=fraud_score,
         fraud_flags=json.dumps(fraud_flags) if fraud_flags else None
     )

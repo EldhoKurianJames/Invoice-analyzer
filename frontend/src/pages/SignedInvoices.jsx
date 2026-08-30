@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { FileText, Download, RefreshCw, Trash2, ExternalLink } from 'lucide-react';
-import { getSignedInvoices, downloadSignedInvoice, getAllInvoices, exportInvoices, deleteAllInvoices } from '../services/api';
+import { FileText, Download, RefreshCw, Trash2, ExternalLink, Archive } from 'lucide-react';
+import { getSignedInvoices, downloadSignedInvoice, getAllInvoices, exportInvoices, deleteAllInvoices, downloadAllSignedInvoices, deleteAllSignedInvoices } from '../services/api';
 
 function SignedInvoices() {
   const [signedFiles, setSignedFiles] = useState([]);
@@ -15,7 +15,7 @@ function SignedInvoices() {
         getSignedInvoices(),
         getAllInvoices()
       ]);
-      setSignedFiles(signedData.files || []);
+      setSignedFiles(signedData.signed_invoices || []);
       setInvoices(invoicesData || []);
     } catch (err) {
       console.error(err);
@@ -41,6 +41,39 @@ function SignedInvoices() {
       a.remove();
     } catch (err) {
       alert('Failed to export: ' + err.message);
+    }
+  };
+
+  const handleDownloadAll = async () => {
+    try {
+      const blob = await downloadAllSignedInvoices();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `signed_invoices_${new Date().toISOString().split('T')[0]}.zip`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      a.remove();
+    } catch (err) {
+      alert('Failed to download all invoices: ' + err.message);
+    }
+  };
+
+  const handleDeleteAllSigned = async () => {
+    if (!window.confirm('Are you sure you want to delete ALL signed invoice PDFs? This cannot be undone.')) {
+      return;
+    }
+    
+    setDeleting(true);
+    try {
+      const result = await deleteAllSignedInvoices();
+      alert(result.message || 'Signed invoices deleted successfully');
+      fetchData();
+    } catch (err) {
+      alert('Failed to delete signed invoices: ' + err.message);
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -80,6 +113,9 @@ function SignedInvoices() {
           <button onClick={fetchData} className="flex items-center gap-2 px-3 py-2 text-sm font-medium border border-slate-200 dark:border-slate-700 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-400 transition-colors">
             <RefreshCw className="w-4 h-4" /> Refresh
           </button>
+          <button onClick={handleDownloadAll} disabled={signedFiles.length === 0} className="flex items-center gap-2 px-3 py-2 text-sm font-medium bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+            <Archive className="w-4 h-4" /> Download All PDFs
+          </button>
           <button onClick={handleExport} className="flex items-center gap-2 px-3 py-2 text-sm font-medium bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors">
             <Download className="w-4 h-4" /> Export Excel
           </button>
@@ -91,7 +127,18 @@ function SignedInvoices() {
 
       {/* Signed PDFs */}
       <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-6 mb-6">
-        <h2 className="text-sm font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-4">Signed PDF Files ({signedFiles.length})</h2>
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-sm font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider">Signed PDF Files ({signedFiles.length})</h2>
+          {signedFiles.length > 0 && (
+            <button 
+              onClick={handleDeleteAllSigned} 
+              disabled={deleting}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border border-red-200 dark:border-red-900 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors disabled:opacity-50"
+            >
+              <Trash2 className="w-3.5 h-3.5" /> {deleting ? 'Deleting...' : 'Delete All PDFs'}
+            </button>
+          )}
+        </div>
         {signedFiles.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
             {signedFiles.map((file, index) => (
@@ -102,7 +149,7 @@ function SignedInvoices() {
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-slate-800 dark:text-slate-100 truncate" title={file.filename}>{file.filename}</p>
-                    <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">{file.size ? `${(file.size / 1024).toFixed(1)} KB` : 'PDF Document'}</p>
+                    <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">{file.size_kb ? `${file.size_kb.toFixed(1)} KB` : 'PDF Document'}</p>
                   </div>
                 </div>
                 <div className="flex gap-2">

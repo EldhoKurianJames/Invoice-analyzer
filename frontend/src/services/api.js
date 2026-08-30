@@ -49,6 +49,16 @@ export const downloadSignedInvoice = (filename) => {
   return `${API_BASE_URL}/invoices/signed/${filename}`;
 };
 
+export const downloadAllSignedInvoices = async () => {
+  const response = await api.get('/invoices/signed-all/download', { responseType: 'blob' });
+  return response.data;
+};
+
+export const deleteAllSignedInvoices = async () => {
+  const response = await api.delete('/invoices/signed-all/delete');
+  return response.data;
+};
+
 // Analytics APIs
 export const getAnalyticsDashboard = async () => {
   const response = await api.get('/analytics/');

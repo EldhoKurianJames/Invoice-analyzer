@@ -1,0 +1,88 @@
+{
+  "id": "default_invoice",
+  "name": "Generic LaTeX-style invoice",
+  "detection": {
+    "keywords": ["invoice", "total", "hs code"],
+    "min_score": 2
+  },
+  "fields": {
+    "invoice_id": {
+      "label": "Invoice No",
+      "direction": "right",
+      "regex": "([\\w-]+)"
+    },
+    "invoice_date": {
+      "label": "Invoice Date",
+      "direction": "right",
+      "regex": "(\\d{1,2}[-/]\\d{1,2}[-/]\\d{4})"
+    },
+    "exporter_name": {
+      "label": "Exporter",
+      "direction": "right"
+    },
+    "customer_name": {
+      "label": "Customer",
+      "direction": "right"
+    },
+    "importer_country": {
+      "label": "Destination",
+      "direction": "right"
+    },
+    "exporter_country": {
+      "label": "Origin",
+      "direction": "right"
+    },
+    "total_amount": {
+      "label": "Total",
+      "direction": "right",
+      "regex": "([\\d,]+\\.?\\d*)"
+    },
+    "subtotal": {
+      "label": "Subtotal",
+      "direction": "right",
+      "regex": "([\\d,]+\\.?\\d*)"
+    },
+    "tax_amount": {
+      "label": "Tax Amount",
+      "direction": "right",
+      "regex": "([\\d,]+\\.?\\d*)"
+    },
+    "tax_percentage": {
+      "label": "Tax Percentage",
+      "direction": "right",
+      "regex": "(\\d+(?:\\.\\d+)?)"
+    }
+  },
+  "line_items": {
+    "headers": {
+      "Description": {
+        "key": "description",
+        "type": "text"
+      },
+      "HS Code": {
+        "key": "hs_code",
+        "regex": "\\b(\\d{6})\\b"
+      },
+      "Quantity": {
+        "key": "quantity",
+        "type": "number"
+      },
+      "Unit Price": {
+        "key": "unit_price",
+        "type": "number"
+      },
+      "Tax %": {
+        "key": "tax_percentage",
+        "regex": "(\\d+(?:\\.\\d+)?)"
+      },
+      "Subtotal": {
+        "key": "subtotal",
+        "type": "number"
+      },
+      "Total": {
+        "key": "total",
+        "type": "number"
+      }
+    }
+  }
+}

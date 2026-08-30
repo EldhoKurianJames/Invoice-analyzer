@@ -197,13 +197,13 @@ function UploadInvoice() {
                 {result.status?.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
               </div>
 
-              {/* Validation Errors */}
-              {result.errors?.length > 0 && (
+              {/* Validation Errors - show for both failed and saved invoices */}
+              {(result.errors?.length > 0 || result.validation_errors?.length > 0) && (
                 <div>
                   <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2">Validation Errors</p>
                   <ul className="space-y-1.5">
-                    {result.errors.map((error, i) => (
-                      <li key={i} className="text-xs text-red-700 bg-red-50 border border-red-100 px-3 py-2 rounded-lg">{error}</li>
+                    {(result.errors || result.validation_errors || []).map((error, i) => (
+                      <li key={i} className="text-xs text-red-700 bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-800 px-3 py-2 rounded-lg">{error}</li>
                     ))}
                   </ul>
                 </div>
@@ -245,8 +245,8 @@ function UploadInvoice() {
               {/* Fraud Analysis */}
               {result.fraud_analysis && (
                 <div className="bg-slate-50 dark:bg-slate-700/50 border border-slate-200 dark:border-slate-600 rounded-lg p-4">
-                  <p className="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-2">Fraud Analysis</p>
-                  <div className="flex items-center gap-3">
+                  <p className="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-2">Invoice Fraud Analysis</p>
+                  <div className="flex items-center gap-3 mb-2">
                     <span className={`text-xs font-bold px-2 py-1 rounded-full ${
                       result.fraud_analysis.risk_level === 'HIGH' ? 'bg-red-100 text-red-700'
                       : result.fraud_analysis.risk_level === 'MEDIUM' ? 'bg-amber-100 text-amber-700'
@@ -255,11 +255,28 @@ function UploadInvoice() {
                     <span className="text-sm text-slate-600 dark:text-slate-300">Score: <span className="font-semibold">{result.fraud_analysis.fraud_score}</span></span>
                   </div>
                   {result.fraud_analysis.flags?.length > 0 && (
-                    <ul className="mt-2 space-y-1">
-                      {result.fraud_analysis.flags.map((flag, i) => (
-                        <li key={i} className="text-xs text-red-600">• {flag}</li>
-                      ))}
-                    </ul>
+                    <div className="mt-2">
+                      <p className="text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Fraud Flags:</p>
+                      <ul className="space-y-1">
+                        {result.fraud_analysis.flags.map((flag, i) => (
+                          <li key={i} className="text-xs text-red-600 dark:text-red-400">• {flag}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                  {result.fraud_analysis.warnings?.length > 0 && (
+                    <div className="mt-3 pt-3 border-t border-slate-200 dark:border-slate-600">
+                      <p className="text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Additional Context:</p>
+                      <ul className="space-y-1">
+                        {result.fraud_analysis.warnings.map((warning, i) => (
+                          <li key={i} className={`text-xs ${
+                            warning.includes('HIGH risk') ? 'text-red-600 dark:text-red-400 font-medium' :
+                            warning.includes('MODERATE risk') ? 'text-amber-600 dark:text-amber-400' :
+                            'text-slate-600 dark:text-slate-400'
+                          }`}>• {warning}</li>
+                        ))}
+                      </ul>
+                    </div>
                   )}
                 </div>
               )}

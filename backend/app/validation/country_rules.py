@@ -63,7 +63,7 @@ COUNTRY_TAX_RATES = {
             "260111": {"rate": 5.0, "description": "Iron Ore Fines"},
             "720851": {"rate": 13.0, "description": "Steel Coils"},
             "854231": {"rate": 13.0, "description": "Electronic Processors"},
-            "520100": {"rate": 16.0, "description": "Cotton"},
+            "520100": {"rate": 25.0, "description": "Cotton"},
         },
         "category_rates": {
             "automotive": {"rate": 25.0, "keywords": ["car", "vehicle", "automobile"]},
